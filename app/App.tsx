@@ -44,9 +44,7 @@ export default function () {
 }
 
 function Dogs() {
-  const { breeds } = useData(() => ({
-    breeds: store.getBreedList(),
-  }));
+  const breeds = useData(() => store.getBreedList());
 
   if (breeds.status !== "success") {
     return <div>Loading...</div>;

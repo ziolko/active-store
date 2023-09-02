@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Signal, execute } from "./core";
 import { SignalDescription, updateCachedDependencies } from "./create-computed";
 
-export function useData<R extends NoFunctionsAllowed<R>>(selector: () => R): R {
-  return useSelector(selector);
+export function useData<
+  R extends NoFunctionsAllowed<R extends (...props: any) => any ? never : R>
+>(selector: () => R): R {
+  return useSelector(selector) as any;
 }
 
 export function useActions<R extends OnlyFunctionsAllowed<R>>(
