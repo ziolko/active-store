@@ -13,7 +13,7 @@ export function createQuery<S extends (...args: any) => any>(factory: S) {
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
   const collection = createCollection((...params: P) =>
-    createQuerySingle<R>(() => factory(...(params as any)))
+    createQuerySingle<R>(() => factory(...(params as any)), factory)
   );
 
   return {
@@ -26,7 +26,7 @@ export function createQuery<S extends (...args: any) => any>(factory: S) {
   };
 }
 
-function createQuerySingle<R>(factory: () => Promise<R>) {
+function createQuerySingle<R>(factory: () => Promise<R>, originalFactory: any) {
   let currentPromise: any = null;
   const state = createState<State<R>>({ status: "pending" });
 
@@ -35,21 +35,29 @@ function createQuerySingle<R>(factory: () => Promise<R>) {
   });
 
   function update() {
-    const promise = factory();
-    currentPromise = promise;
-    promise.then(
+    const { value, signals } = execute(factory);
+
+    if (signals.size > 0) {
+      console.warn(
+        "You have used signals in createQuery factory function. This will lead to bugs.",
+        originalFactory
+      );
+    }
+
+    currentPromise = value;
+    value.then(
       (data: any) => {
-        if (promise === currentPromise) {
+        if (value === currentPromise) {
           state.set({ status: "success", data });
         }
       },
       (error: any) => {
-        if (promise === currentPromise) {
+        if (value === currentPromise) {
           state.set({ status: "error", error });
         }
       }
     );
-    return promise;
+    return value;
   }
 
   return {
