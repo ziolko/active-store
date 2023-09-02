@@ -1,33 +1,29 @@
-import { Effect, createDependencySignal, execute } from "./core";
+import { Signal, createSignal, execute } from "./core";
 import { createCollection } from "./create-collection";
 
-export function createComputed<S extends (...params: any[]) => any>(
-  selector: S
-) {
-  type T = ReturnType<S>;
+export function createComputed<S extends (...args: any) => any>(selector: S) {
   type P = Parameters<S>;
+  type R = ReturnType<S>;
 
   const collection = createCollection((...params: P) =>
-    createComputedSingle(() => selector(...params))
+    createComputedSingle<R>(() => selector(...(params as any)))
   );
 
   return {
-    get(...params: P): T {
+    get(...params: P): R {
       return collection.get(...params).get();
     },
   };
 }
 
-function createComputedSingle<S extends () => unknown>(selector: S) {
-  type T = ReturnType<S>;
-
-  const cache: Cache<T> = {
+function createComputedSingle<R>(selector: () => R) {
+  const cache: Cache<R> = {
     value: null as any,
     version: NaN,
-    nestedDependencies: new Map(),
+    nestedSignals: new Map(),
   };
 
-  const effect = createDependencySignal({
+  const signal = createSignal({
     getVersion: () => state.getVersion(),
     onSubscribe() {
       state = state.onSubscribe();
@@ -41,16 +37,16 @@ function createComputedSingle<S extends () => unknown>(selector: S) {
     },
   });
 
-  let state: State<T> = new WithoutSubscribers<T>(
+  let state: State<R> = new WithoutSubscribers<R>(
     selector as any,
     0,
-    effect.notify,
+    signal.notify,
     cache
   );
 
   return {
-    get(): T {
-      execute.current.register(effect);
+    get(): R {
+      execute.current.register(signal);
       return state.getValue();
     },
   };
@@ -64,12 +60,12 @@ interface State<T> {
 }
 
 interface Cache<T> {
-  nestedDependencies: Map<Effect, EffectDescription>;
+  nestedSignals: Map<Signal, SignalDescription>;
   value: T;
   version: number;
 }
 
-export interface EffectDescription {
+export interface SignalDescription {
   unsubscribe?: () => void;
   version?: number;
 }
@@ -85,16 +81,16 @@ class WithoutSubscribers<T> implements State<T> {
     if (
       this.cached.version > 0 &&
       !hasAnyDependencyChanged(
-        this.cached.nestedDependencies,
-        new Set(this.cached.nestedDependencies.keys())
+        this.cached.nestedSignals,
+        new Set(this.cached.nestedSignals.keys())
       )
     ) {
       return this.cached.value;
     }
 
-    const { value, effects } = execute(this.selector);
+    const { value, signals: effects } = execute(this.selector);
 
-    updateCachedEffects(this.cached.nestedDependencies, effects);
+    updateCachedDependencies(this.cached.nestedSignals, effects);
 
     if (!Object.is(value, this.cached.value)) {
       this.currentVersion += 1;
@@ -106,7 +102,7 @@ class WithoutSubscribers<T> implements State<T> {
     return value;
   }
   getVersion() {
-    for (const [effect, cache] of this.cached.nestedDependencies) {
+    for (const [effect, cache] of this.cached.nestedSignals) {
       if (effect.getVersion?.() !== cache.version) {
         return this.currentVersion + 1 || 0;
       }
@@ -128,15 +124,12 @@ class WithoutSubscribers<T> implements State<T> {
 }
 
 class WithSubscribers<T> implements State<T> {
-  private subscriptionsCount = 0;
-
   constructor(
     private selector: () => T,
     private currentVersion: number,
     private onChange: () => void,
     private cached: Cache<T>
   ) {
-    this.subscriptionsCount = 1;
     cached.version = NaN;
     this.getValue();
   }
@@ -149,17 +142,17 @@ class WithSubscribers<T> implements State<T> {
     if (
       this.cached.version > 0 &&
       !hasAnyDependencyChanged(
-        this.cached.nestedDependencies,
-        new Set(this.cached.nestedDependencies.keys())
+        this.cached.nestedSignals,
+        new Set(this.cached.nestedSignals.keys())
       )
     ) {
       return this.cached.value;
     }
 
-    const { value, effects } = execute(this.selector);
+    const { value, signals: effects } = execute(this.selector);
 
-    updateCachedEffects(
-      this.cached.nestedDependencies,
+    updateCachedDependencies(
+      this.cached.nestedSignals,
       effects,
       this.onDependencyChanged
     );
@@ -175,26 +168,20 @@ class WithSubscribers<T> implements State<T> {
     return this.currentVersion;
   }
   onSubscribe(): State<T> {
-    this.subscriptionsCount += 1;
-    return this;
+    throw new Error("Not expected to run this 'onSubscribe' on this class");
   }
   onUnsubscribe(): State<T> {
-    this.subscriptionsCount -= 1;
-
-    if (this.subscriptionsCount === 0) {
-      for (const effect of this.cached.nestedDependencies.values()) {
-        effect.unsubscribe?.();
-        effect.unsubscribe = undefined;
-      }
-      return new WithoutSubscribers(
-        this.selector,
-        this.currentVersion,
-        this.onChange,
-        this.cached
-      );
+    for (const effect of this.cached.nestedSignals.values()) {
+      effect.unsubscribe?.();
+      effect.unsubscribe = undefined;
     }
 
-    return this;
+    return new WithoutSubscribers(
+      this.selector,
+      this.currentVersion,
+      this.onChange,
+      this.cached
+    );
   }
   onDependencyChanged = () => {
     this.currentVersion += 1;
@@ -202,48 +189,48 @@ class WithSubscribers<T> implements State<T> {
   };
 }
 
-export function updateCachedEffects(
-  cachedEffects: Map<Effect, EffectDescription>,
-  newEffects: Set<Effect>,
+export function updateCachedDependencies(
+  cachedSignals: Map<Signal, SignalDescription>,
+  newSignals: Set<Signal>,
   onDependencyChanged?: () => void
 ) {
-  // Search for existing and new effects
-  for (const effect of newEffects) {
-    let cached = cachedEffects.get(effect);
+  // Search for existing and new signals
+  for (const signal of newSignals) {
+    let cached = cachedSignals.get(signal);
     if (!cached) {
       cached = {};
-      cachedEffects.set(effect, cached);
+      cachedSignals.set(signal, cached);
     }
 
-    cached.version = effect.getVersion?.();
+    cached.version = signal.getVersion?.();
 
     if (onDependencyChanged && !cached.unsubscribe) {
-      cached.unsubscribe = effect.subscribe(onDependencyChanged);
+      cached.unsubscribe = signal.subscribe(onDependencyChanged);
     }
   }
 
   // Search for effects that are no longer there
-  for (const [key, value] of cachedEffects) {
-    if (!cachedEffects.has(key)) {
+  for (const [key, value] of cachedSignals) {
+    if (!cachedSignals.has(key)) {
       if (value.unsubscribe && !onDependencyChanged) {
         throw new Error("Unexpected to have unsubscribe here");
       }
       value.unsubscribe?.();
-      cachedEffects.delete(key);
+      cachedSignals.delete(key);
     }
   }
 }
 
 function hasAnyDependencyChanged(
-  cachedEffects: Map<Effect, EffectDescription>,
-  newEffects: Set<Effect>
+  cachedSignals: Map<Signal, SignalDescription>,
+  newSignals: Set<Signal>
 ) {
-  if (cachedEffects.size !== newEffects.size) {
+  if (cachedSignals.size !== newSignals.size) {
     return true;
   }
 
-  for (const effect of newEffects) {
-    if (cachedEffects.get(effect)?.version !== effect.getVersion?.()) {
+  for (const signal of newSignals) {
+    if (cachedSignals.get(signal)?.version !== signal.getVersion?.()) {
       return true;
     }
   }

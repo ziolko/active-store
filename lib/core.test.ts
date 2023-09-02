@@ -1,24 +1,21 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import {
-  createDependencySignal as createDependencySignal,
-  execute,
-} from "./core";
+import { createSignal as createSignal, execute } from "./core";
 
-describe("createDependencySignal", () => {
+describe("createSignal", () => {
   it("Calls subscribed function", () => {
     const listener = jest.fn();
-    const dependency = createDependencySignal();
-    dependency.subscribe(listener);
-    dependency.notify();
+    const signal = createSignal();
+    signal.subscribe(listener);
+    signal.notify();
     expect(listener).toBeCalledTimes(1);
   });
 
   it("Doesn't call subscribed function if unsubscribed", () => {
     const listener = jest.fn();
-    const effect = createDependencySignal();
-    const unsubscribe = effect.subscribe(listener);
+    const signal = createSignal();
+    const unsubscribe = signal.subscribe(listener);
     unsubscribe();
-    effect.notify();
+    signal.notify();
     expect(listener).not.toBeCalled();
   });
 });
@@ -29,32 +26,32 @@ describe("execute", () => {
     expect(value).toEqual("test-value");
   });
 
-  it("Returns registered effect from selector", () => {
-    const effect = createDependencySignal({ getVersion: () => 1 });
-    const { effects } = execute(() => execute.current.register(effect));
-    expect(effects.size).toEqual(1);
-    expect(effects.values().next().value.getVersion()).toEqual(1);
+  it("Returns registered signal from selector", () => {
+    const signal = createSignal({ getVersion: () => 1 });
+    const { signals } = execute(() => execute.current.register(signal));
+    expect(signals.size).toEqual(1);
+    expect(signals.values().next().value.getVersion()).toEqual(1);
   });
 
-  it("Registers the same effect once even if registered multiple times", () => {
-    const effect = createDependencySignal();
-    const { effects } = execute(() => {
-      execute.current.register(effect);
-      execute.current.register(effect);
-      execute.current.register(effect);
+  it("Registers the same signal once even if registered multiple times", () => {
+    const signal = createSignal();
+    const { signals } = execute(() => {
+      execute.current.register(signal);
+      execute.current.register(signal);
+      execute.current.register(signal);
     });
-    expect(effects.size).toEqual(1);
+    expect(signals.size).toEqual(1);
   });
 
   it("Handles exceptions gracefully", () => {
-    const testEffectsSet = new Set<any>();
-    execute.current.effects = testEffectsSet;
+    const testSignalSet = new Set<any>();
+    execute.current.signals = testSignalSet;
 
     function selector() {
       throw new Error("test-error");
     }
 
     expect(() => execute(selector)).toThrow();
-    expect(execute.current.effects).toBe(testEffectsSet);
+    expect(execute.current.signals).toBe(testSignalSet);
   });
 });

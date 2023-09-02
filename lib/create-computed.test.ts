@@ -1,7 +1,7 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import createState from "./create-state";
 import { createComputed } from "./create-computed";
-import { createDependencySignal, execute } from "./core";
+import { createSignal, execute } from "./core";
 
 describe("createComputed", () => {
   it("Return computed value", () => {
@@ -104,7 +104,7 @@ function createTestContext() {
   const onNestedDependencySubscribed = jest.fn(
     () => onNestedDependencyUnsubscribed
   );
-  const nestedDependency = createDependencySignal({
+  const nestedDependency = createSignal({
     getVersion: () => 0,
     onSubscribe: onNestedDependencySubscribed,
   });
@@ -113,7 +113,7 @@ function createTestContext() {
     return { text: `${hello.get()} ${world.get()}` };
   });
 
-  const { effects } = execute(() => computed.get());
+  const { signals: effects } = execute(() => computed.get());
 
   expect(effects.size).toEqual(1);
   const effect = effects.values().next().value;

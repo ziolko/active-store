@@ -1,5 +1,6 @@
 import createState from "../lib/create-state";
 import { createComputed } from "../lib/create-computed";
+import { createQuery } from "../lib/create-query";
 
 type ToDoItem = { id: number; name: string; isDone: boolean };
 
@@ -31,6 +32,25 @@ function createTodoApp() {
 
   const count = createComputed((value: number) => items.get().length + value);
 
+  const breedList = createQuery(() =>
+    fetch("https://dog.ceo/api/breeds/list/all")
+      .then((x) => x.json())
+      .then((data) => Object.keys(data.message))
+  );
+
+  const versionedBreedImage = createQuery((breed: string, version: number) =>
+    fetch(`https://dog.ceo/api/breed/${breed}/images/random?version=${version}`)
+      .then((x) => x.json())
+      .then((data) => data.message as string)
+  );
+
+  const breedImage = createComputed((breed: string) =>
+    versionedBreedImage.get(breed, items.get().length)
+  );
+
+  const updateBreedImage = (breed: string) =>
+    versionedBreedImage.update(breed, items.get().length);
+
   return {
     getNewItem: newItem.get,
     setNewItem: newItem.set,
@@ -39,6 +59,9 @@ function createTodoApp() {
     addItem,
     removeItem,
     toggleItem,
+    getBreedList: breedList.get,
+    getBreedImage: breedImage.get,
+    updateBreedImage,
   };
 }
 

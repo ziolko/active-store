@@ -1,4 +1,4 @@
-export function createCollection<S extends (...params: any[]) => any>(
+export function createCollection<S extends (...params: any) => any>(
   selector: S
 ) {
   type R = ReturnType<S>;
@@ -11,7 +11,7 @@ export function createCollection<S extends (...params: any[]) => any>(
       const key = hashQueryKey(params);
       let result = dataCache.get(key)!;
       if (!result && !dataCache.has(key)) {
-        result = selector(...params);
+        result = selector(...(params as any));
         dataCache.set(key, result);
       }
       return result;

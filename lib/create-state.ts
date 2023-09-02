@@ -1,20 +1,18 @@
-import { createDependencySignal, execute } from "./core";
+import { createSignal, execute } from "./core";
 
-export default function createState<T>(initialValue: T) {
+export default function createState<V>(initialValue: V) {
   let value = initialValue;
-  let version = 0;
-  const effect = createDependencySignal({ getVersion: () => version });
+  const signal = createSignal();
 
   return {
-    get(): T {
-      execute.current.register(effect);
+    get(): V {
+      execute.current.register(signal);
       return value;
     },
-    set(newValue: T) {
+    set(newValue: V) {
       if (newValue !== value) {
         value = newValue;
-        version += 1;
-        effect.notify();
+        signal.notify();
       }
     },
   };

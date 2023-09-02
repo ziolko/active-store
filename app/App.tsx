@@ -37,6 +37,40 @@ export default function () {
           <button onClick={() => actions.removeItem(item.id)}>x</button>
         </div>
       ))}
+
+      <Dogs />
     </div>
+  );
+}
+
+function Dogs() {
+  const { breeds } = useData(() => ({
+    breeds: store.getBreedList(),
+  }));
+
+  if (breeds.status !== "success") {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <ul>
+      {breeds.data?.map((name) => (
+        <Breed breed={name} key={name} />
+      ))}
+    </ul>
+  );
+}
+
+function Breed(props: { breed: string }) {
+  const image = useData(() => store.getBreedImage(props.breed));
+  const refresh = useActions(() => store.updateBreedImage);
+
+  return (
+    <li style={{ marginBottom: 10 }}>
+      {props.breed}
+      <button onClick={() => refresh(props.breed)}>Refresh</button>
+      <br />
+      {image.data ? <img src={image.data} height={80} /> : "Loading"}
+    </li>
   );
 }

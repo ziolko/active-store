@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Effect, execute } from "./core";
-import { EffectDescription, updateCachedEffects } from "./create-computed";
+import { Signal, execute } from "./core";
+import { SignalDescription, updateCachedDependencies } from "./create-computed";
 
 export function useData<R extends NoFunctionsAllowed<R>>(selector: () => R): R {
   return useSelector(selector);
@@ -23,25 +23,25 @@ type OnlyFunctionsAllowed<T> = {
 function useSelector<R>(selector: () => R) {
   const [state, updateState] = useState<{
     version: number;
-    cachedEffects: Map<Effect, EffectDescription>;
+    cachedSignals: Map<Signal, SignalDescription>;
   }>({} as any);
 
-  const { value, effects } = execute(selector);
-  const versions = new Map<Effect, number>();
+  const { value, signals } = execute(selector);
+  const versions = new Map<Signal, number>();
 
-  for (const effect of effects) {
-    versions.set(effect, effect.getVersion());
+  for (const signal of signals) {
+    versions.set(signal, signal.getVersion());
   }
 
   useEffect(() => {
     state.version = 0;
-    state.cachedEffects = new Map();
+    state.cachedSignals = new Map();
 
     return () => {
-      for (const effect of state.cachedEffects.values()) {
-        effect.unsubscribe?.();
+      for (const signal of state.cachedSignals.values()) {
+        signal.unsubscribe?.();
       }
-      state.cachedEffects.clear();
+      state.cachedSignals.clear();
     };
   }, []);
 
@@ -49,13 +49,13 @@ function useSelector<R>(selector: () => R) {
     const forceRerender = () =>
       updateState((state: any) => ({ ...state, version: state.version + 1 }));
 
-    for (const effect of effects) {
-      if (versions.get(effect) !== effect.getVersion()) {
+    for (const signal of signals) {
+      if (versions.get(signal) !== signal.getVersion()) {
         return forceRerender();
       }
     }
 
-    updateCachedEffects(state.cachedEffects, effects, forceRerender);
+    updateCachedDependencies(state.cachedSignals, signals, forceRerender);
   });
 
   return value;

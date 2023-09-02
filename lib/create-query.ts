@@ -1,59 +1,62 @@
-import { Effect, createDependencySignal } from "./core";
+import { createSignal, execute } from "./core";
+import { createCollection } from "./create-collection";
 import createState from "./create-state";
 
-export default function createSingleQuery<
-  T extends (key: string) => Promise<any>
->(factory: T) {
-  const data = new Map<
-    string,
-    {
-      version: 0;
-      promise: Promise<any>;
-      dependency: Effect;
-      sideEffect: Effect;
-      state: any;
-    }
-  >();
+type State<T> = {
+  status: "pending" | "error" | "success";
+  data?: T;
+  error?: any;
+};
 
-  let subscribersCount = 0;
-  function onSubscribe(key: string) {
-    if (subscribersCount === 0) {
-      console.log("Subscribe" + key);
-    }
-    subscribersCount += 1;
+export function createQuery<S extends (...args: any) => any>(factory: S) {
+  type P = Parameters<S>;
+  type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
-    let isUnsubscribed = false;
-    return () => {
-      if (isUnsubscribed) {
-        return;
+  const collection = createCollection((...params: P) =>
+    createQuerySingle<R>(() => factory(...(params as any)))
+  );
+
+  return {
+    get(...params: Parameters<typeof factory>) {
+      return collection.get(...(params as any)).get();
+    },
+    update(...params: Parameters<typeof factory>) {
+      return collection.get(...(params as any)).update();
+    },
+  };
+}
+
+function createQuerySingle<R>(factory: () => Promise<R>) {
+  let currentPromise: any = null;
+  const state = createState<State<R>>({ status: "pending" });
+
+  const signal = createSignal({
+    onSubscribe: () => void update(),
+  });
+
+  function update() {
+    const promise = factory();
+    currentPromise = promise;
+    promise.then(
+      (data: any) => {
+        if (promise === currentPromise) {
+          state.set({ status: "success", data });
+        }
+      },
+      (error: any) => {
+        if (promise === currentPromise) {
+          state.set({ status: "error", error });
+        }
       }
-
-      isUnsubscribed = true;
-      subscribersCount -= 1;
-
-      if (subscribersCount === 0) {
-        console.log("Unsubscribe" + key);
-      }
-    };
+    );
+    return promise;
   }
 
   return {
-    get(key: string) {
-      let entry = data.get(key);
-      if (!entry) {
-        entry = {
-          version: 0,
-          promise: factory(key),
-          dependency: createDependencySignal({
-            getVersion: () => entry!.version,
-          }),
-          sideEffect: createDependencySignal({
-            onSubscribe: () => onSubscribe(key),
-          }),
-          state: createState({ status: "pending", data: null, error: null }),
-        };
-        data.set(key, entry);
-      }
+    get() {
+      execute.current.register(signal);
+      return state.get();
     },
+    update,
   };
 }

@@ -1,69 +1,89 @@
-export type Effect = {
+export type Signal = {
   getId: () => number;
-  subscribe: (listener: (effect: Effect) => any) => () => void;
+  subscribe: (listener: (effect: Signal) => any) => () => void;
   notify: () => void;
   getVersion: () => number;
 };
 
-let lastEffectId = 0;
-
-type CreateDependencySignalOptions = {
+type CreateSignalOptions = {
   getVersion?: () => number;
-  onSubscribe?: () => () => void;
+  onSubscribe?: () => (() => void) | void;
 };
 
-export function createDependencySignal({
+let lastSignalId = 0;
+
+export function createSignal({
   onSubscribe,
-  getVersion = () => 0,
-}: CreateDependencySignalOptions = {}): Effect {
+  getVersion,
+}: CreateSignalOptions = {}): Signal {
   let listenerCount = 0;
-  const effectId = lastEffectId++;
+  let version = 0;
+  let unsubscribe: (() => void) | void;
+
+  const signalId = lastSignalId++;
   const listeners = new Map();
+
   const result = {
     getId() {
-      return effectId;
+      return signalId;
     },
     notify() {
+      version += 1;
       for (const entry of listeners) {
         entry[1](result);
       }
     },
-    subscribe(listener: (effect: Effect) => void) {
+    subscribe(listener: (effect: Signal) => void) {
       const id = listenerCount++;
+
+      if (listeners.size === 0) {
+        unsubscribe = onSubscribe?.();
+      }
+
       listeners.set(id, listener);
-      const unsubscribe = onSubscribe?.();
+      let hasUnsubscribed = false;
       return () => {
+        if (hasUnsubscribed) {
+          return;
+        }
+
         listeners.delete(id);
-        unsubscribe?.();
+        hasUnsubscribed = true;
+
+        if (listeners.size === 0 && typeof unsubscribe === "function") {
+          unsubscribe?.();
+          unsubscribe = undefined;
+        }
       };
     },
-    getVersion: getVersion,
+    getVersion: getVersion ?? (() => version),
   };
   return result;
 }
 
-export function execute<S extends () => unknown>(
-  selector: S
-): { value: ReturnType<S>; effects: Set<Effect> } {
-  const oldEffects = execute.current.effects;
+export function execute<R>(selector: () => R): {
+  value: R;
+  signals: Set<Signal>;
+} {
+  const previousSignals = execute.current.signals;
 
   try {
-    const effects = new Set<Effect>();
-    execute.current.effects = effects;
+    const signals = new Set<Signal>();
+    execute.current.signals = signals;
     const value = selector();
-    execute.current.effects = oldEffects;
-    return { value, effects } as any;
+    execute.current.signals = previousSignals;
+    return { value, signals } as any;
   } catch (error) {
-    execute.current.effects = oldEffects;
+    execute.current.signals = previousSignals;
     throw error;
   }
 }
 
 execute.current = {
-  effects: null as Set<Effect> | null,
-  register(effect: Effect) {
-    if (effect && execute.current.effects) {
-      execute.current.effects.add(effect);
+  signals: null as Set<Signal> | null,
+  register(signal: Signal) {
+    if (signal && execute.current.signals) {
+      execute.current.signals.add(signal);
     }
   },
 };
