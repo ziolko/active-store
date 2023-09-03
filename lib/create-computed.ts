@@ -1,4 +1,4 @@
-import { Signal, createSignal, execute } from "./core";
+import { createSignal, execute } from "./core";
 import { createCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 import createState from "./create-state";
@@ -19,9 +19,14 @@ export function createComputed<S extends (...args: any) => any>(selector: S) {
 }
 
 function createComputedSingle<R>(selector: () => R) {
-  const dependencies = createDependenciesTracker();
+  const dependencies = createDependenciesTracker(onDependencyUpdated);
   const cache = createState({ value: null as R, version: 0 });
   const state = { isSubscribed: false, hasAnyDependencyChanged: false };
+
+  function onDependencyUpdated() {
+    state.hasAnyDependencyChanged = true;
+    signal.notify();
+  }
 
   function updateCache() {
     if (state.isSubscribed && !state.hasAnyDependencyChanged) {
@@ -37,16 +42,11 @@ function createComputedSingle<R>(selector: () => R) {
     dependencies.update(signals);
 
     if (state.isSubscribed) {
-      dependencies.subscribe(onDependencyUpdated);
+      dependencies.subscribe();
     }
 
     cache.set({ value, version: cache.get().version + 1 });
     state.hasAnyDependencyChanged = false;
-  }
-
-  function onDependencyUpdated() {
-    state.hasAnyDependencyChanged = true;
-    signal.notify();
   }
 
   const signal = createSignal({
@@ -59,7 +59,7 @@ function createComputedSingle<R>(selector: () => R) {
         cache.set({ value, version: cache.get().version + 1 });
       }
 
-      dependencies.subscribe(onDependencyUpdated);
+      dependencies.subscribe();
       state.hasAnyDependencyChanged = false;
 
       return () => {

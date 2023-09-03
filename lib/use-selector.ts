@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
-import { Signal, execute } from "./core";
+import { useSyncExternalStore, useMemo, useRef, useEffect } from "react";
+import shallowequal from "shallowequal";
+
+import { execute } from "./core";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
 export function useData<
@@ -14,41 +16,44 @@ export function useActions<R extends OnlyFunctionsAllowed<R>>(
   return useSelector(selector);
 }
 
-function useSelector<R>(selector: () => R) {
-  const [state, updateState] = useState({
-    version: NaN,
-    dependencies: createDependenciesTracker(),
-  });
+function createUseSelectorState() {
+  let onUpdated: any;
+  let dependencies = createDependenciesTracker(() => onUpdated());
+  let cachedValue: any = undefined;
 
-  const { value, signals } = execute(selector);
-  const versions = new Map<Signal, number>();
+  return {
+    subscribe(updated: () => void) {
+      onUpdated = updated;
+      dependencies.subscribe();
 
-  for (const signal of signals) {
-    versions.set(signal, signal.getVersion());
-  }
+      return () => {
+        dependencies?.unsubscribe();
+        onUpdated = null;
+      };
+    },
+    getSnapshot(selector: () => any) {
+      const { value, signals } = execute(selector);
+      dependencies.update(signals);
 
-  useEffect(() => {
-    state.version = 0;
-    return () => {
-      state.dependencies.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    const forceRerender = () =>
-      updateState((state: any) => ({ ...state, version: state.version + 1 }));
-
-    for (const signal of signals) {
-      if (versions.get(signal) !== signal.getVersion()) {
-        return forceRerender();
+      if (onUpdated) {
+        dependencies.subscribe();
       }
-    }
 
-    state.dependencies.update(signals);
-    state.dependencies.subscribe(forceRerender);
-  });
+      if (!Object.is(cachedValue, value) && !shallowequal(cachedValue, value)) {
+        cachedValue = value;
+      }
 
-  return value;
+      return cachedValue;
+    },
+  };
+}
+
+function useSelector<R>(selector: () => R) {
+  const state = useMemo(createUseSelectorState, []);
+
+  return useSyncExternalStore(state.subscribe, () =>
+    state.getSnapshot(selector)
+  );
 }
 
 type NoFunctionsAllowed<T> = {
@@ -58,3 +63,13 @@ type NoFunctionsAllowed<T> = {
 type OnlyFunctionsAllowed<T> = {
   [P in keyof T]: T[P] extends (...args: any) => any ? T[P] : never;
 };
+
+export function useStaleWhileRevalidate<T>(value: T, isValid: boolean) {
+  const cache = useRef(value);
+  useEffect(() => {
+    if (isValid) {
+      cache.current = value;
+    }
+  }, [isValid, value]);
+  return isValid ? value : cache.current;
+}

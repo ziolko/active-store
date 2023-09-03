@@ -5,7 +5,7 @@ interface CachedSignal {
   version?: number;
 }
 
-export function createDependenciesTracker() {
+export function createDependenciesTracker(onDependencyChanged: () => void) {
   let isInitialized = false;
   const cache = new Map<Signal, CachedSignal>();
 
@@ -49,7 +49,7 @@ export function createDependenciesTracker() {
 
       isInitialized = true;
     },
-    subscribe(onDependencyChanged: () => void) {
+    subscribe() {
       for (const [key, value] of cache) {
         if (!value.unsubscribe) {
           value.unsubscribe = key.subscribe(onDependencyChanged);

@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { useActions, useData } from "../lib/use-selector";
+import {
+  useActions,
+  useData,
+  useStaleWhileRevalidate,
+} from "../lib/use-selector";
 
 import store from "./store";
 
 export default function () {
-  const [value, setValue] = useState(0);
+  const [page, setPage] = useState(0);
 
   const data = useData(() => ({
     newItem: store.getNewItem(),
     items: store.getItems(),
-    count: store.getCount(value),
+    count: store.getCount(page),
   }));
 
   const actions = useActions(() => ({
@@ -20,30 +24,15 @@ export default function () {
 
   return (
     <div>
-      <div>
-        <button onClick={() => setValue(value - 1)}>-1</button>
-        {value}
-        <button onClick={() => setValue(value + 1)}>+1</button>
-      </div>
-      <input
-        value={data.newItem}
-        onChange={(e) => actions.setNewItem(e.target.value)}
-      />
-      <button onClick={actions.addItem}>Add</button>
-      <div>Items: {data.count}</div>
-      {data.items.map((item) => (
-        <div key={item.id}>
-          {item.name}{" "}
-          <button onClick={() => actions.removeItem(item.id)}>x</button>
-        </div>
-      ))}
-
-      <Dogs />
+      <button onClick={() => setPage(page - 1)}>-1</button>
+      {page}
+      <button onClick={() => setPage(page + 1)}>+1</button>
+      <Dogs page={page} />
     </div>
   );
 }
 
-function Dogs() {
+function Dogs(props: { page: number }) {
   const breeds = useData(() => store.getBreedList());
   const refreshAll = useActions(() => store.updateAllBreeds);
 
@@ -56,23 +45,25 @@ function Dogs() {
       <button onClick={refreshAll}>Refresh all</button>
       <ul>
         {breeds.data?.map((name) => (
-          <Breed breed={name} key={name} />
+          <Breed breed={name} page={props.page} key={name} />
         ))}
       </ul>
     </div>
   );
 }
 
-function Breed(props: { breed: string }) {
-  const image = useData(() => store.getBreedImage(props.breed));
+function Breed(props: { breed: string; page: number }) {
   const refresh = useActions(() => store.updateSingleBreed);
+  const image = useData(() => store.getBreedImage(props.breed, props.page));
+  const staleImage = useStaleWhileRevalidate(image, image.isSuccess);
 
   return (
     <li style={{ marginBottom: 10 }}>
       {props.breed}
-      <button onClick={() => refresh(props.breed)}>Refresh</button>
+
+      <button onClick={() => refresh(props.breed, props.page)}>Refresh</button>
       <br />
-      {image.data ? <img src={image.data} height={80} /> : null}
+      {staleImage.data ? <img src={staleImage.data} height={80} /> : null}
       {image.isLoading && "Loading..."}
     </li>
   );

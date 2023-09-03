@@ -2,12 +2,19 @@ import { createSignal, execute } from "./core";
 import { createCollection } from "./create-collection";
 import createState from "./create-state";
 
+enum Status {
+  IDLE = "idle",
+  LOADING = "loading",
+  ERROR = "error",
+  SUCCESS = "success",
+}
+
 type State<T> = {
   isSuccess: boolean;
   isIdle: boolean;
   isError: boolean;
   isLoading: boolean;
-  status: "loading" | "idle" | "error" | "success";
+  status: "idle" | "loading" | "error" | "success";
   data?: T;
   error?: any;
 };
@@ -24,8 +31,8 @@ export function createQuery<S extends (...args: any) => any>(factory: S) {
     get(...params: Parameters<typeof factory>) {
       return collection.get(...(params as any)).get();
     },
-    update(...params: Parameters<typeof factory>) {
-      return collection.get(...(params as any)).update();
+    refresh(...params: Parameters<typeof factory>) {
+      return collection.get(...(params as any)).refresh();
     },
     getAll() {
       return collection.getAll();
@@ -33,52 +40,69 @@ export function createQuery<S extends (...args: any) => any>(factory: S) {
   };
 }
 
+function getStatuses<T>(status: Status, data?: T, error?: any) {
+  const getStatus = (
+    status: any,
+    isIdle: boolean,
+    isLoading: boolean,
+    isSuccess: boolean,
+    isError: boolean
+  ) => ({
+    status,
+    isIdle,
+    isLoading,
+    isSuccess,
+    isError,
+  });
+
+  const getBackground = (
+    backgroundStatus: any,
+    isRefreshing: boolean,
+    isOptimisticUpdate: boolean
+  ) => ({
+    backgroundStatus,
+    isRefreshing,
+    isOptimisticUpdate,
+  });
+
+  const mainStatuses = {
+    [Status.IDLE]: getStatus("idle", true, false, false, false),
+    [Status.LOADING]: getStatus("loading", false, true, false, false),
+    [Status.SUCCESS]: getStatus("success", false, false, true, false),
+    [Status.ERROR]: getStatus("error", false, false, false, true),
+  };
+
+  return {
+    ...mainStatuses[status],
+    data,
+    error,
+  };
+}
+
 function createQuerySingle<R>(factory: () => Promise<R>) {
   let currentPromise: any = null;
-  const state = createState<State<R>>({
-    status: "idle",
-    isError: false,
-    isLoading: false,
-    isSuccess: false,
-    isIdle: true,
-  });
+  const state = createState<State<R>>(getStatuses(Status.IDLE));
 
   const signal = createSignal({
-    onSubscribe: () => void update(),
+    onSubscribe: () => void setTimeout(refresh, 0), // set timeout to avoid "The result of getSnapshot should be cached"
   });
 
-  function update() {
+  function refresh() {
     const value = factory();
     currentPromise = value;
+    const current = state.get();
 
-    state.set({
-      ...state.get(),
-      isLoading: true,
-    });
+    state.set(getStatuses(Status.LOADING, current.data, current.error));
 
     value.then(
       (data: any) => {
         if (value === currentPromise) {
-          state.set({
-            status: "success",
-            data,
-            isSuccess: true,
-            isError: false,
-            isIdle: false,
-            isLoading: false,
-          });
+          state.set(getStatuses(Status.SUCCESS, data));
         }
       },
       (error: any) => {
         if (value === currentPromise) {
-          state.set({
-            status: "error",
-            error,
-            isSuccess: false,
-            isError: true,
-            isIdle: false,
-            isLoading: false,
-          });
+          state.set(getStatuses(Status.ERROR, undefined, error));
         }
       }
     );
@@ -90,6 +114,6 @@ function createQuerySingle<R>(factory: () => Promise<R>) {
       execute.current.register(signal);
       return state.get();
     },
-    update,
+    refresh,
   };
 }

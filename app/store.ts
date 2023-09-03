@@ -35,19 +35,21 @@ function createTodoApp() {
   const breedList = createQuery(() =>
     fetch("https://dog.ceo/api/breeds/list/all")
       .then((x) => x.json())
-      .then((data) => Object.keys(data.message))
+      .then((data) => Object.keys(data.message).filter((_, i) => i > -1))
   );
 
-  const breedImage = createQuery((breed: string) =>
+  const breedImage = createQuery((breed: string, page: number) =>
     new Promise((x) => setTimeout(x, 500))
       .then(() => fetch(`https://dog.ceo/api/breed/${breed}/images/random`))
       .then((x) => x.json())
       .then((data) => data.message as string)
   );
 
-  const updateSingleBreed = (breed: string) => breedImage.update(breed);
+  const updateSingleBreed = (breed: string, page: number) =>
+    breedImage.refresh(breed, page);
+
   const updateAllBreeds = () =>
-    breedImage.getAll().forEach((item) => item.update());
+    breedImage.getAll().forEach((item) => item.refresh());
 
   return {
     getNewItem: newItem.get,
