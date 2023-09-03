@@ -38,18 +38,16 @@ function createTodoApp() {
       .then((data) => Object.keys(data.message))
   );
 
-  const versionedBreedImage = createQuery((breed: string, version: number) =>
-    fetch(`https://dog.ceo/api/breed/${breed}/images/random?version=${version}`)
+  const breedImage = createQuery((breed: string) =>
+    new Promise((x) => setTimeout(x, 500))
+      .then(() => fetch(`https://dog.ceo/api/breed/${breed}/images/random`))
       .then((x) => x.json())
       .then((data) => data.message as string)
   );
 
-  const breedImage = createComputed((breed: string) =>
-    versionedBreedImage.get(breed, items.get().length)
-  );
-
-  const updateBreedImage = (breed: string) =>
-    versionedBreedImage.update(breed, items.get().length);
+  const updateSingleBreed = (breed: string) => breedImage.update(breed);
+  const updateAllBreeds = () =>
+    breedImage.getAll().forEach((item) => item.update());
 
   return {
     getNewItem: newItem.get,
@@ -61,7 +59,8 @@ function createTodoApp() {
     toggleItem,
     getBreedList: breedList.get,
     getBreedImage: breedImage.get,
-    updateBreedImage,
+    updateSingleBreed,
+    updateAllBreeds,
   };
 }
 

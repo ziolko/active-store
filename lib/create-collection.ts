@@ -16,6 +16,9 @@ export function createCollection<S extends (...params: any) => any>(
       }
       return result;
     },
+    getAll() {
+      return new Set(dataCache.values());
+    },
   };
 }
 

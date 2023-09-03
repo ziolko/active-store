@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Signal, execute } from "./core";
-import { SignalDescription, updateCachedDependencies } from "./create-computed";
+import { createDependenciesTracker } from "./create-dependencies-tracker";
 
 export function useData<
   R extends NoFunctionsAllowed<R extends (...props: any) => any ? never : R>
@@ -14,19 +14,11 @@ export function useActions<R extends OnlyFunctionsAllowed<R>>(
   return useSelector(selector);
 }
 
-type NoFunctionsAllowed<T> = {
-  [P in keyof T]: T[P] extends (...args: any) => any ? never : T[P];
-};
-
-type OnlyFunctionsAllowed<T> = {
-  [P in keyof T]: T[P] extends (...args: any) => any ? T[P] : never;
-};
-
 function useSelector<R>(selector: () => R) {
-  const [state, updateState] = useState<{
-    version: number;
-    cachedSignals: Map<Signal, SignalDescription>;
-  }>({} as any);
+  const [state, updateState] = useState({
+    version: NaN,
+    dependencies: createDependenciesTracker(),
+  });
 
   const { value, signals } = execute(selector);
   const versions = new Map<Signal, number>();
@@ -37,13 +29,8 @@ function useSelector<R>(selector: () => R) {
 
   useEffect(() => {
     state.version = 0;
-    state.cachedSignals = new Map();
-
     return () => {
-      for (const signal of state.cachedSignals.values()) {
-        signal.unsubscribe?.();
-      }
-      state.cachedSignals.clear();
+      state.dependencies.unsubscribe();
     };
   }, []);
 
@@ -57,8 +44,17 @@ function useSelector<R>(selector: () => R) {
       }
     }
 
-    updateCachedDependencies(state.cachedSignals, signals, forceRerender);
+    state.dependencies.update(signals);
+    state.dependencies.subscribe(forceRerender);
   });
 
   return value;
 }
+
+type NoFunctionsAllowed<T> = {
+  [P in keyof T]: T[P] extends (...args: any) => any ? never : T[P];
+};
+
+type OnlyFunctionsAllowed<T> = {
+  [P in keyof T]: T[P] extends (...args: any) => any ? T[P] : never;
+};

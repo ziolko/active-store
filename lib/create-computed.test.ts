@@ -10,37 +10,37 @@ describe("createComputed", () => {
   });
 
   it("Updates returned value when one of dependencies changes", () => {
-    const { world, computed, effect } = createTestContext();
-    const version = effect.getVersion!();
+    const { world, computed, valueSignal } = createTestContext();
+    const version = valueSignal.getVersion!();
 
     world.set("DEMO");
     expect(computed.get().text).toBe("Hello DEMO");
-    expect(effect.getVersion!()).toBe(version + 1);
+    expect(valueSignal.getVersion!()).toBe(version + 1);
   });
 
   it("Doesn't recompute value with each 'get' if there's no active subscription", () => {
-    const { computed, effect } = createTestContext();
-    const version = effect.getVersion!();
+    const { computed, valueSignal } = createTestContext();
+    const version = valueSignal.getVersion!();
 
     const result1 = computed.get();
     const result2 = computed.get();
 
     expect(result1).toBe(result2);
-    expect(effect.getVersion!()).toBe(version);
+    expect(valueSignal.getVersion!()).toBe(version);
   });
 
   it("Updates version if there's no active subscription and one of dependencies changes", () => {
-    const { world, effect } = createTestContext();
-    const version = effect.getVersion!();
+    const { world, dependenciesSignal } = createTestContext();
+    const version = dependenciesSignal.getVersion!();
 
     world.set("TEST");
 
-    expect(effect.getVersion!()).toBe(version + 1);
+    expect(dependenciesSignal.getVersion!()).toBe(version + 1);
   });
 
   it("Subscribes to effects of nested dependencies", () => {
     const {
-      effect,
+      dependenciesSignal,
       computed,
       onNestedDependencySubscribed,
       onNestedDependencyUnsubscribed,
@@ -48,8 +48,8 @@ describe("createComputed", () => {
 
     computed.get();
 
-    const unsubscribe1 = effect.subscribe(() => null);
-    const unsubscribe2 = effect.subscribe(() => null);
+    const unsubscribe1 = dependenciesSignal.subscribe(() => null);
+    const unsubscribe2 = dependenciesSignal.subscribe(() => null);
 
     expect(onNestedDependencySubscribed).toBeCalledTimes(1);
     expect(onNestedDependencyUnsubscribed).toBeCalledTimes(0);
@@ -64,36 +64,36 @@ describe("createComputed", () => {
   });
 
   it("Doesn't recompute value with each 'get' if there's an active subscription", () => {
-    const { computed, effect } = createTestContext();
+    const { computed, valueSignal, dependenciesSignal } = createTestContext();
 
-    effect.subscribe(() => null);
+    dependenciesSignal.subscribe(() => null);
 
-    const version = effect.getVersion!();
+    const version = valueSignal.getVersion!();
 
     const result1 = computed.get();
     const result2 = computed.get();
 
     expect(result1).toBe(result2);
-    expect(version).toBe(effect.getVersion!());
+    expect(version).toBe(valueSignal.getVersion!());
   });
 
   it("Notifies about changes in one of dependencies if there's active subscription", () => {
-    const { world, effect } = createTestContext();
+    const { world, dependenciesSignal } = createTestContext();
     const listener = jest.fn();
 
-    effect.subscribe(listener);
+    dependenciesSignal.subscribe(listener);
 
-    const version = effect.getVersion!();
+    const version = dependenciesSignal.getVersion!();
 
     expect(listener).toHaveBeenCalledTimes(0);
 
     world.set("DEMO 1");
-    expect(effect.getVersion!()).toBe(version + 1);
+    expect(dependenciesSignal.getVersion!()).toBe(version + 1);
     expect(listener).toHaveBeenCalledTimes(1);
 
     world.set("DEMO 2");
     expect(listener).toHaveBeenCalledTimes(2);
-    expect(effect.getVersion!()).toBe(version + 2);
+    expect(dependenciesSignal.getVersion!()).toBe(version + 2);
   });
 });
 
@@ -113,16 +113,25 @@ function createTestContext() {
     return { text: `${hello.get()} ${world.get()}` };
   });
 
-  const { signals: effects } = execute(() => computed.get());
+  const { signals } = execute(() => computed.get());
 
-  expect(effects.size).toEqual(1);
-  const effect = effects.values().next().value;
+  expect(signals.size).toEqual(2);
+  const signalsArray = Array.from(signals.values());
+
+  // @ts-ignore
+  const dependenciesSignal = signalsArray.find((x) => x.isDependencies)!;
+  // @ts-ignore
+  const valueSignal = signalsArray.find((x) => !x.isDependencies)!;
+
+  expect(dependenciesSignal).toBeDefined();
+  expect(valueSignal).toBeDefined();
 
   return {
     hello,
     world,
     computed,
-    effect,
+    dependenciesSignal,
+    valueSignal,
     onNestedDependencySubscribed,
     onNestedDependencyUnsubscribed,
   };

@@ -45,30 +45,35 @@ export default function () {
 
 function Dogs() {
   const breeds = useData(() => store.getBreedList());
+  const refreshAll = useActions(() => store.updateAllBreeds);
 
-  if (breeds.status !== "success") {
+  if (!breeds.isSuccess) {
     return <div>Loading...</div>;
   }
 
   return (
-    <ul>
-      {breeds.data?.map((name) => (
-        <Breed breed={name} key={name} />
-      ))}
-    </ul>
+    <div>
+      <button onClick={refreshAll}>Refresh all</button>
+      <ul>
+        {breeds.data?.map((name) => (
+          <Breed breed={name} key={name} />
+        ))}
+      </ul>
+    </div>
   );
 }
 
 function Breed(props: { breed: string }) {
   const image = useData(() => store.getBreedImage(props.breed));
-  const refresh = useActions(() => store.updateBreedImage);
+  const refresh = useActions(() => store.updateSingleBreed);
 
   return (
     <li style={{ marginBottom: 10 }}>
       {props.breed}
       <button onClick={() => refresh(props.breed)}>Refresh</button>
       <br />
-      {image.data ? <img src={image.data} height={80} /> : "Loading"}
+      {image.data ? <img src={image.data} height={80} /> : null}
+      {image.isLoading && "Loading..."}
     </li>
   );
 }

@@ -10,7 +10,7 @@ export default function createState<V>(initialValue: V) {
       return value;
     },
     set(newValue: V) {
-      if (newValue !== value) {
+      if (!Object.is(newValue, value)) {
         value = newValue;
         signal.notify();
       }
