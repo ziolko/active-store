@@ -40,45 +40,6 @@ export function createQuery<S extends (...args: any) => any>(factory: S) {
   };
 }
 
-function getStatuses<T>(status: Status, data?: T, error?: any) {
-  const getStatus = (
-    status: any,
-    isIdle: boolean,
-    isLoading: boolean,
-    isSuccess: boolean,
-    isError: boolean
-  ) => ({
-    status,
-    isIdle,
-    isLoading,
-    isSuccess,
-    isError,
-  });
-
-  const getBackground = (
-    backgroundStatus: any,
-    isRefreshing: boolean,
-    isOptimisticUpdate: boolean
-  ) => ({
-    backgroundStatus,
-    isRefreshing,
-    isOptimisticUpdate,
-  });
-
-  const mainStatuses = {
-    [Status.IDLE]: getStatus("idle", true, false, false, false),
-    [Status.LOADING]: getStatus("loading", false, true, false, false),
-    [Status.SUCCESS]: getStatus("success", false, false, true, false),
-    [Status.ERROR]: getStatus("error", false, false, false, true),
-  };
-
-  return {
-    ...mainStatuses[status],
-    data,
-    error,
-  };
-}
-
 function createQuerySingle<R>(factory: () => Promise<R>) {
   let currentPromise: any = null;
   const state = createState<State<R>>(getStatuses(Status.IDLE));
@@ -116,4 +77,29 @@ function createQuerySingle<R>(factory: () => Promise<R>) {
     },
     refresh,
   };
+}
+
+function getStatuses<T>(status: Status, data?: T, error?: any) {
+  const statuses = {
+    [Status.IDLE]: getStatus("idle", true, false, false, false),
+    [Status.LOADING]: getStatus("loading", false, true, false, false),
+    [Status.SUCCESS]: getStatus("success", false, false, true, false),
+    [Status.ERROR]: getStatus("error", false, false, false, true),
+  };
+
+  return {
+    ...statuses[status],
+    data,
+    error,
+  };
+}
+
+function getStatus(
+  status: any,
+  isIdle: boolean,
+  isLoading: boolean,
+  isSuccess: boolean,
+  isError: boolean
+) {
+  return { status, isIdle, isLoading, isSuccess, isError };
 }

@@ -42,7 +42,7 @@ function createTodoApp() {
     new Promise((x) => setTimeout(x, 500))
       .then(() => fetch(`https://dog.ceo/api/breed/${breed}/images/random`))
       .then((x) => x.json())
-      .then((data) => data.message as string)
+      .then((data) => ({ img: data.message as string, page }))
   );
 
   const updateSingleBreed = (breed: string, page: number) =>

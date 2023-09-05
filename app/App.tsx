@@ -55,7 +55,7 @@ function Dogs(props: { page: number }) {
 function Breed(props: { breed: string; page: number }) {
   const refresh = useActions(() => store.updateSingleBreed);
   const image = useData(() => store.getBreedImage(props.breed, props.page));
-  const staleImage = useStaleWhileRevalidate(image, image.isSuccess);
+  const imageData = useStaleWhileRevalidate(image.data, image.isSuccess);
 
   return (
     <li style={{ marginBottom: 10 }}>
@@ -63,8 +63,10 @@ function Breed(props: { breed: string; page: number }) {
 
       <button onClick={() => refresh(props.breed, props.page)}>Refresh</button>
       <br />
-      {staleImage.data ? <img src={staleImage.data} height={80} /> : null}
+      {imageData ? <img src={imageData.img} height={80} /> : null}
+      {imageData?.page}
       {image.isLoading && "Loading..."}
+      {image.isError && <span style={{ color: "red" }}>ERROR!</span>}
     </li>
   );
 }

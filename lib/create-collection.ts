@@ -1,23 +1,76 @@
+import { Signal, createSignal, execute } from "./core";
+
+export interface CollectionOptions {
+  inertia?: number;
+}
+
 export function createCollection<S extends (...params: any) => any>(
-  selector: S
+  selector: S,
+  options: CollectionOptions = {}
 ) {
   type R = ReturnType<S>;
   type P = Parameters<S>;
 
-  const dataCache = new Map<string, R>();
+  type CacheEntry = { data: R; signal?: Signal };
+  const cache = new Map<string, CacheEntry>();
+
+  function createCacheEntry(key: string, params: any) {
+    const entry: CacheEntry = { data: selector(...params) };
+
+    if (options.inertia == null) {
+      return entry;
+    }
+
+    entry.signal = createSignal({
+      onSubscribe() {
+        stopTimer();
+        return startTimer;
+      },
+    });
+
+    let timeoutHandler: number | undefined;
+
+    function startTimer() {
+      clearTimeout(timeoutHandler);
+      timeoutHandler = setTimeout(onTimeout, options.inertia) as any;
+    }
+
+    function stopTimer() {
+      clearTimeout(timeoutHandler);
+      timeoutHandler = undefined;
+    }
+
+    function onTimeout() {
+      cache.delete(key);
+      entry.signal?.notify();
+    }
+
+    startTimer();
+
+    return entry;
+  }
 
   return {
     get(...params: P): R {
       const key = hashQueryKey(params);
-      let result = dataCache.get(key)!;
-      if (!result && !dataCache.has(key)) {
-        result = selector(...(params as any));
-        dataCache.set(key, result);
+      let result = cache.get(key)!;
+      if (!cache.has(key)) {
+        result = createCacheEntry(key, params);
+        cache.set(key, result);
       }
-      return result;
+
+      if (result.signal) {
+        execute.current.register(result.signal);
+      }
+
+      return result.data;
     },
     getAll() {
-      return new Set(dataCache.values());
+      const result = new Set<R>();
+      for (const entry of cache.values()) {
+        result.add(entry.data);
+      }
+      return result;
     },
   };
 }

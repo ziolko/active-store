@@ -4,7 +4,7 @@ import { createComputed } from "./create-computed";
 import { createSignal, execute } from "./core";
 
 describe("createComputed", () => {
-  it("Return computed value", () => {
+  it("Returns computed value", () => {
     const { computed } = createTestContext();
     expect(computed.get().text).toEqual("Hello World");
   });

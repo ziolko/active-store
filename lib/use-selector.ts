@@ -1,4 +1,10 @@
-import { useSyncExternalStore, useMemo, useRef, useEffect } from "react";
+import {
+  useSyncExternalStore,
+  useMemo,
+  useRef,
+  useEffect,
+  useState,
+} from "react";
 import shallowequal from "shallowequal";
 
 import { execute } from "./core";
@@ -72,4 +78,18 @@ export function useStaleWhileRevalidate<T>(value: T, isValid: boolean) {
     }
   }, [isValid, value]);
   return isValid ? value : cache.current;
+}
+
+export function useMutation<S extends () => any>(action: S) {
+  const [state, setState] = useState({
+    status: "idle",
+    result: undefined,
+    error: undefined,
+  });
+
+  function execute() {
+    // TODO: Implement mutation hook (asnyc)
+  }
+
+  return { ...state, execute };
 }
