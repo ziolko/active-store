@@ -19,20 +19,27 @@ type State<T> = {
   error?: any;
 };
 
-export function createQuery<S extends (...args: any) => any>(factory: S) {
+export interface QueryOptions {
+  ttl?: number;
+}
+
+export function createQuery<S extends (...args: any) => any>(
+  factory: S,
+  options: QueryOptions = {}
+) {
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
   const collection = createCollection((...params: P) =>
-    createQuerySingle<R>(() => factory(...(params as any)))
+    createQuerySingle<R>(() => factory(...(params as any)), options)
   );
 
   return {
     get(...params: Parameters<typeof factory>) {
       return collection.get(...(params as any)).get();
     },
-    refresh(...params: Parameters<typeof factory>) {
-      return collection.get(...(params as any)).refresh();
+    fetch(...params: Parameters<typeof factory>) {
+      return collection.get(...(params as any)).fetch();
     },
     getAll() {
       return collection.getAll();
@@ -40,15 +47,18 @@ export function createQuery<S extends (...args: any) => any>(factory: S) {
   };
 }
 
-function createQuerySingle<R>(factory: () => Promise<R>) {
+function createQuerySingle<R>(
+  factory: () => Promise<R>,
+  options: QueryOptions
+) {
   let currentPromise: any = null;
   const state = createState<State<R>>(getStatuses(Status.IDLE));
 
   const signal = createSignal({
-    onSubscribe: () => void setTimeout(refresh, 0), // set timeout to avoid "The result of getSnapshot should be cached"
+    onSubscribe: () => void setTimeout(fetch, 0), // set timeout to avoid "The result of getSnapshot should be cached"
   });
 
-  function refresh() {
+  function fetch() {
     const value = factory();
     currentPromise = value;
     const current = state.get();
@@ -75,7 +85,7 @@ function createQuerySingle<R>(factory: () => Promise<R>) {
       execute.current.register(signal);
       return state.get();
     },
-    refresh,
+    fetch,
   };
 }
 

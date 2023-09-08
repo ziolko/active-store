@@ -1,41 +1,19 @@
-import createState from "../lib/create-state";
 import { createComputed } from "../lib/create-computed";
 import { createQuery } from "../lib/create-query";
+import { initializeApp } from "firebase/app";
+import { getDatabase } from "firebase/database";
+import { createDocument } from "../lib/firebase";
 
-type ToDoItem = { id: number; name: string; isDone: boolean };
+const firebaseConfig = {
+  databaseURL:
+    "https://dataman-c1d94-default-rtdb.europe-west1.firebasedatabase.app",
+};
 
 function createTodoApp() {
-  const newItem = createState("");
-  const items = createState<ToDoItem[]>([]);
-
-  const addItem = () => {
-    items.set([
-      ...items.get(),
-      { id: Date.now(), name: newItem.get(), isDone: false },
-    ]);
-    newItem.set("");
-  };
-
-  const removeItem = (id: number) => {
-    items.set(items.get().filter((x) => x.id !== id));
-  };
-
-  const toggleItem = (id: number) => {
-    items.set(
-      items
-        .get()
-        .map((item) =>
-          item.id === id ? { ...item, isDone: !item.isDone } : item
-        )
-    );
-  };
-
-  const count = createComputed((value: number) => items.get().length + value);
-
   const breedList = createQuery(() =>
     fetch("https://dog.ceo/api/breeds/list/all")
       .then((x) => x.json())
-      .then((data) => Object.keys(data.message).filter((_, i) => i > -1))
+      .then((data) => Object.keys(data.message))
   );
 
   const breedImage = createQuery((breed: string, page: number) =>
@@ -46,19 +24,18 @@ function createTodoApp() {
   );
 
   const updateSingleBreed = (breed: string, page: number) =>
-    breedImage.refresh(breed, page);
+    breedImage.fetch(breed, page);
 
-  const updateAllBreeds = () =>
-    breedImage.getAll().forEach((item) => item.refresh());
+  const updateAllBreeds = (page: number) => {
+    return breedList
+      .get()
+      .data?.forEach((breed) => breedImage.fetch(breed, page));
+  };
+
+  const fb = createFirebaseStore();
 
   return {
-    getNewItem: newItem.get,
-    setNewItem: newItem.set,
-    getItems: items.get,
-    getCount: count.get,
-    addItem,
-    removeItem,
-    toggleItem,
+    ...fb,
     getBreedList: breedList.get,
     getBreedImage: breedImage.get,
     updateSingleBreed,
@@ -68,3 +45,14 @@ function createTodoApp() {
 
 const store = createTodoApp();
 export default store;
+
+function createFirebaseStore() {
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const text = createDocument<string>("/todo/new", { db });
+  const textLength = createComputed(() => text.get()?.length ?? 0);
+  const couter = createDocument<number>("/todo/couter", { db });
+
+  return { text, textLength, couter };
+}
