@@ -1,6 +1,6 @@
 {
   "name": "active-store",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "",
   "scripts": {
     "test": "jest",
@@ -9,7 +9,9 @@
     "build": "vite build"
   },
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "./dist/active-store.umd.cjs",
   "module": "./dist/active-store.js",
   "exports": {
@@ -22,7 +24,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "shallowequal": "^1.1.0"
+    "shallowequal": "^1.1.0",
+    "vite-plugin-dts": "^3.5.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.21",

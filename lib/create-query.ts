@@ -30,8 +30,10 @@ export function createQuery<S extends (...args: any) => any>(
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
-  const collection = createCollection((...params: P) =>
-    createQuerySingle<R>(() => factory(...(params as any)), options)
+  const collection = createCollection(
+    (...params: P) =>
+      createQuerySingle<R>(() => factory(...(params as any)), options),
+    { inertia: options.ttl }
   );
 
   return {
