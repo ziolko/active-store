@@ -1,6 +1,6 @@
 import { createSignal, execute } from "./core";
 
-export default function createState<V>(initialValue: V) {
+export function createState<V>(initialValue: V) {
   let value = initialValue;
   const signal = createSignal();
 

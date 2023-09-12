@@ -19,7 +19,7 @@ export function useData<
 export function useActions<R extends OnlyFunctionsAllowed<R>>(
   selector: () => R
 ) {
-  return useSelector(selector);
+  return useSelector(selector) as R;
 }
 
 function createUseSelectorState() {

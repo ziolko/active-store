@@ -1,39 +1,29 @@
-import {
-  useActions,
-  useData,
-  useStaleWhileRevalidate,
-} from "../lib/use-selector";
+import { useState } from "react";
+import { useActions, useData, useStaleWhileRevalidate } from "../lib/react";
 
 import store from "./store";
 
 export default function () {
-  const page = useData(() => store.couter.get());
-  const setPage = useActions(() => store.couter.set);
+  const [page, setPage] = useState(0);
 
-  if (page === undefined) {
-    return <div>Loading...</div>;
-  }
+  const data = useData(() => ({
+    newItem: store.getNewItem(),
+    items: store.getItems(),
+    count: store.getCount(page),
+  }));
+
+  const actions = useActions(() => ({
+    setNewItem: store.setNewItem,
+    addItem: store.addItem,
+    removeItem: store.removeItem,
+  }));
 
   return (
     <div>
-      <SearchInput />
       <button onClick={() => setPage(page - 1)}>-1</button>
       {page}
       <button onClick={() => setPage(page + 1)}>+1</button>
       <Dogs page={page} />
-    </div>
-  );
-}
-
-function SearchInput() {
-  const text = useData(() => store.text.get() ?? "");
-  const setText = useActions(() => store.text.set);
-  const textLength = useData(() => store.textLength.get());
-
-  return (
-    <div>
-      <input value={text} onChange={(e) => setText(e.target.value)} />
-      <span>{textLength}</span>
     </div>
   );
 }
@@ -48,7 +38,7 @@ function Dogs(props: { page: number }) {
 
   return (
     <div>
-      <button onClick={() => refreshAll(props.page)}>Refresh all</button>
+      <button onClick={refreshAll}>Refresh all</button>
       <ul>
         {breeds.data?.map((name) => (
           <Breed breed={name} page={props.page} key={name} />

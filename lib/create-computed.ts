@@ -1,7 +1,7 @@
 import { createSignal, execute } from "./core";
 import { createCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
-import createState from "./create-state";
+import { createState } from "./create-state";
 
 export function createComputed<S extends (...args: any) => any>(selector: S) {
   type P = Parameters<S>;
@@ -13,7 +13,7 @@ export function createComputed<S extends (...args: any) => any>(selector: S) {
 
   return {
     get(...params: P): R {
-      return collection.get(...params).get();
+      return collection.get(...params)();
     },
   };
 }
@@ -76,11 +76,9 @@ function createComputedSingle<R>(selector: () => R) {
   // @ts-ignore - used for testing
   signal.isDependencies = true;
 
-  return {
-    get(): R {
-      execute.current.register(signal);
-      updateCache();
-      return cache.get().value;
-    },
+  return (): R => {
+    execute.current.register(signal);
+    updateCache();
+    return cache.get().value;
   };
 }

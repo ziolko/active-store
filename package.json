@@ -1,15 +1,29 @@
 {
-  "name": "dataman",
-  "version": "1.0.0",
+  "name": "active-store",
+  "version": "0.0.1",
   "description": "",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "start": "vite"
+    "start": "vite",
+    "build": "vite build"
+  },
+  "type": "module",
+  "files": ["dist"],
+  "main": "./dist/active-store.umd.cjs",
+  "module": "./dist/active-store.js",
+  "exports": {
+    ".": {
+      "import": "./dist/active-store.js",
+      "require": "./dist/active-store.umd.cjs"
+    }
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "shallowequal": "^1.1.0"
+  },
   "devDependencies": {
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
@@ -18,11 +32,8 @@
     "ts-jest": "^29.1.1",
     "vite": "^4.4.9"
   },
-  "dependencies": {
-    "firebase": "^10.3.1",
+  "peerDependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "shallowequal": "^1.1.0",
-    "ts-node": "^10.9.1"
+    "react-dom": "^18.2.0"
   }
 }

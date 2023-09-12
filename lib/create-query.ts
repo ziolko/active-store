@@ -1,6 +1,6 @@
 import { createSignal, execute } from "./core";
 import { createCollection } from "./create-collection";
-import createState from "./create-state";
+import { createState } from "./create-state";
 
 enum Status {
   IDLE = "idle",

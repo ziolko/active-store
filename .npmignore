@@ -1,0 +1,7 @@
+node_modules
+app
+lib
+index.html
+jest.config.js
+vite.config.js
+tsconfig.json

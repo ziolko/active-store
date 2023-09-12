@@ -1,5 +1,5 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import createState from "./create-state";
+import { createState } from "./create-state";
 import { Signal, execute } from "./core";
 
 describe("createState", () => {
