@@ -50,7 +50,8 @@ function createTodoApp() {
     breedImage.getAll().forEach((item) => item.fetch());
 
   async function asyncAction(name: string, age: number) {
-    return 12;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return `${name} -- ${age}`;
   }
 
   return {

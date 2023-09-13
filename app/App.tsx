@@ -11,24 +11,13 @@ import store from "./store";
 export default function () {
   const [page, setPage] = useState(0);
 
-  const data = useData(() => ({
-    newItem: store.getNewItem(),
-    items: store.getItems(),
-    count: store.getCount(page),
-  }));
-
-  const actions = useActions(() => ({
-    setNewItem: store.setNewItem,
-    addItem: store.addItem,
-    removeItem: store.removeItem,
-    asyncAction: store.asyncAction,
-  }));
+  const action = useAsyncAction(() => store.asyncAction);
 
   return (
     <div>
-      <button onClick={() => setPage(page - 1)}>-1</button>
-      {page}
-      <button onClick={() => setPage(page + 1)}>+1</button>
+      {action.status}
+      {action.result}
+      <button onClick={() => action.execute("Mateusz", 12)}>Run</button>
       <Dogs page={page} />
     </div>
   );

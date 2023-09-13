@@ -41,7 +41,9 @@ export function useAsyncAction<S extends () => (...args: any) => Promise<any>>(
     lastCallIdRef.current += 1;
     const callId = lastCallIdRef.current;
     try {
-      setState({ status: "pending" });
+      setState((state) =>
+        state.status === "pending" ? state : { status: "pending" }
+      );
       const result = await action(...(params as any[]));
       if (lastCallIdRef.current === callId) {
         setState({ status: "success", result });

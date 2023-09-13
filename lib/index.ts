@@ -5,7 +5,7 @@ export { createQuery } from "./create-query";
 export { createSignal, execute } from "./core";
 export {
   useData,
-  useMutation,
   useActions,
+  useAsyncAction,
   useStaleWhileRevalidate,
 } from "./react";
