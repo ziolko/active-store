@@ -16,10 +16,44 @@ export function useData<
   return useSelector(selector) as any;
 }
 
-export function useActions<R extends OnlyFunctionsAllowed<R>>(
-  selector: () => R
-) {
+export function useActions<
+  R extends Record<string, (...args: any) => any> | ((...args: any) => any)
+>(selector: () => R) {
   return useSelector(selector) as R;
+}
+
+export function useAsyncAction<S extends () => (...args: any) => Promise<any>>(
+  selector: S
+) {
+  type MutationState = {
+    status: "idle" | "pending" | "success" | "error";
+    result?: ReturnType<ReturnType<S>> extends Promise<infer T>
+      ? T
+      : ReturnType<ReturnType<S>>;
+    error?: any;
+  };
+
+  const action = useSelector(selector);
+  const [state, setState] = useState<MutationState>({ status: "idle" });
+  const lastCallIdRef = useRef(0);
+
+  async function execute(...params: Parameters<ReturnType<S>>) {
+    lastCallIdRef.current += 1;
+    const callId = lastCallIdRef.current;
+    try {
+      setState({ status: "pending" });
+      const result = await action(...(params as any[]));
+      if (lastCallIdRef.current === callId) {
+        setState({ status: "success", result });
+      }
+    } catch (error: any) {
+      if (lastCallIdRef.current === callId) {
+        setState({ status: "error", error });
+      }
+    }
+  }
+
+  return { ...state, execute };
 }
 
 function createUseSelectorState() {
@@ -66,10 +100,6 @@ type NoFunctionsAllowed<T> = {
   [P in keyof T]: T[P] extends (...args: any) => any ? never : T[P];
 };
 
-type OnlyFunctionsAllowed<T> = {
-  [P in keyof T]: T[P] extends (...args: any) => any ? T[P] : never;
-};
-
 export function useStaleWhileRevalidate<T>(value: T, isValid: boolean) {
   const cache = useRef(value);
   useEffect(() => {
@@ -78,18 +108,4 @@ export function useStaleWhileRevalidate<T>(value: T, isValid: boolean) {
     }
   }, [isValid, value]);
   return isValid ? value : cache.current;
-}
-
-export function useMutation<S extends () => any>(action: S) {
-  const [state, setState] = useState({
-    status: "idle",
-    result: undefined,
-    error: undefined,
-  });
-
-  function execute() {
-    // TODO: Implement mutation hook (asnyc)
-  }
-
-  return { ...state, execute };
 }

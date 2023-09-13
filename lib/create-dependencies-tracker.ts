@@ -41,7 +41,7 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
 
       // Search for signals that are no longer there
       for (const [key, value] of cache) {
-        if (!cache.has(key)) {
+        if (!dependencies.has(key)) {
           value.unsubscribe?.();
           cache.delete(key);
         }

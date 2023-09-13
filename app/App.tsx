@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { useActions, useData, useStaleWhileRevalidate } from "../lib/react";
+import {
+  useActions,
+  useAsyncAction,
+  useData,
+  useStaleWhileRevalidate,
+} from "../lib/react";
 
 import store from "./store";
 
@@ -16,6 +21,7 @@ export default function () {
     setNewItem: store.setNewItem,
     addItem: store.addItem,
     removeItem: store.removeItem,
+    asyncAction: store.asyncAction,
   }));
 
   return (

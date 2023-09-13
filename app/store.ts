@@ -49,6 +49,10 @@ function createTodoApp() {
   const updateAllBreeds = () =>
     breedImage.getAll().forEach((item) => item.fetch());
 
+  async function asyncAction(name: string, age: number) {
+    return 12;
+  }
+
   return {
     getNewItem: newItem.get,
     setNewItem: newItem.set,
@@ -61,6 +65,7 @@ function createTodoApp() {
     getBreedImage: breedImage.get,
     updateSingleBreed,
     updateAllBreeds,
+    asyncAction,
   };
 }
 
