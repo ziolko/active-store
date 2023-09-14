@@ -49,11 +49,11 @@ describe("createCollection", () => {
     const value = collection.get(1);
     expect(collection.get(1)).toBe(value);
 
-    const { signals } = execute(() => collection.get(1));
+    const { topics } = execute(() => collection.get(1));
     const unsubscribes = [];
 
-    for (const signal of signals) {
-      unsubscribes.push(signal.subscribe(() => null));
+    for (const topic of topics) {
+      unsubscribes.push(topic.subscribe(() => null));
     }
 
     jest.advanceTimersByTime(6000);

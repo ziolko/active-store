@@ -1,18 +1,18 @@
-import { createSignal, execute } from "./core";
+import { createTopic } from "./core";
 
 export function createState<V>(initialValue: V) {
   let value = initialValue;
-  const signal = createSignal();
+  const topic = createTopic();
 
   return {
     get(): V {
-      execute.current.register(signal);
+      topic.register();
       return value;
     },
     set(newValue: V) {
       if (!Object.is(newValue, value)) {
         value = newValue;
-        signal.notify();
+        topic.newVersion();
       }
     },
   };

@@ -1,16 +1,16 @@
-import { Signal } from "./core";
+import { Topic } from "./core";
 
-interface CachedSignal {
+interface CachedTopic {
   unsubscribe?: () => void;
   version?: number;
 }
 
 export function createDependenciesTracker(onDependencyChanged: () => void) {
   let isInitialized = false;
-  const cache = new Map<Signal, CachedSignal>();
+  const cache = new Map<Topic, CachedTopic>();
 
   return {
-    hasChanged(dependencies: Set<Signal> = new Set(cache.keys())) {
+    hasChanged(dependencies: Set<Topic> = new Set(cache.keys())) {
       if (!isInitialized) {
         return true;
       }
@@ -19,27 +19,27 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
         return true;
       }
 
-      for (const signal of dependencies) {
-        if (cache.get(signal)?.version !== signal.getVersion?.()) {
+      for (const topic of dependencies) {
+        if (cache.get(topic)?.version !== topic.getVersion?.()) {
           return true;
         }
       }
 
       return false;
     },
-    update(dependencies: Set<Signal>) {
-      // Search for existing and new signals
-      for (const signal of dependencies) {
-        let cached = cache.get(signal);
+    update(dependencies: Set<Topic>) {
+      // Search for existing and new topics
+      for (const topic of dependencies) {
+        let cached = cache.get(topic);
         if (!cached) {
           cached = {};
-          cache.set(signal, cached);
+          cache.set(topic, cached);
         }
 
-        cached.version = signal.getVersion?.();
+        cached.version = topic.getVersion?.();
       }
 
-      // Search for signals that are no longer there
+      // Search for topics that are no longer there
       for (const [key, value] of cache) {
         if (!dependencies.has(key)) {
           value.unsubscribe?.();

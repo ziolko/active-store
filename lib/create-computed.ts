@@ -1,4 +1,4 @@
-import { createSignal, execute } from "./core";
+import { createTopic, execute } from "./core";
 import { createCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 import { createState } from "./create-state";
@@ -25,7 +25,7 @@ function createComputedSingle<R>(selector: () => R) {
 
   function onDependencyUpdated() {
     state.hasAnyDependencyChanged = true;
-    signal.notify();
+    topic.newVersion();
   }
 
   function updateCache() {
@@ -37,9 +37,9 @@ function createComputedSingle<R>(selector: () => R) {
       return;
     }
 
-    const { value, signals } = execute(selector);
+    const { value, topics } = execute(selector);
 
-    dependencies.update(signals);
+    dependencies.update(topics);
 
     if (state.isSubscribed) {
       dependencies.subscribe();
@@ -49,13 +49,13 @@ function createComputedSingle<R>(selector: () => R) {
     state.hasAnyDependencyChanged = false;
   }
 
-  const signal = createSignal({
+  const topic = createTopic({
     onSubscribe() {
       state.isSubscribed = true;
 
       if (dependencies.hasChanged()) {
-        const { value, signals } = execute(selector);
-        dependencies.update(signals);
+        const { value, topics } = execute(selector);
+        dependencies.update(topics);
         cache.set({ value, version: cache.get().version + 1 });
       }
 
@@ -74,10 +74,10 @@ function createComputedSingle<R>(selector: () => R) {
   });
 
   // @ts-ignore - used for testing
-  signal.isDependencies = true;
+  topic.isDependencies = true;
 
   return (): R => {
-    execute.current.register(signal);
+    topic.register();
     updateCache();
     return cache.get().value;
   };

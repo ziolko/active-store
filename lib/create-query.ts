@@ -1,4 +1,4 @@
-import { createSignal, execute } from "./core";
+import { createTopic, execute } from "./core";
 import { createCollection } from "./create-collection";
 import { createState } from "./create-state";
 
@@ -56,7 +56,7 @@ function createQuerySingle<R>(
   let currentPromise: any = null;
   const state = createState<State<R>>(getStatuses(Status.IDLE));
 
-  const signal = createSignal({
+  const topic = createTopic({
     onSubscribe: () => void setTimeout(fetch, 0), // set timeout to avoid "The result of getSnapshot should be cached"
   });
 
@@ -84,7 +84,7 @@ function createQuerySingle<R>(
 
   return {
     get() {
-      execute.current.register(signal);
+      topic.register();
       return state.get();
     },
     fetch,

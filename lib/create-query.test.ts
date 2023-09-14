@@ -17,17 +17,19 @@ describe("createQuery", () => {
     jest.advanceTimersByTime(2000);
   });
 
-  it("Returns isSuccess after fetch is done", () => {
+  it("Returns isSuccess after fetch is done", async () => {
     const query = createQuery((id: number) => success(id));
     query.fetch(1);
     jest.advanceTimersByTime(2000);
+    await Promise.resolve();
     expect(query.get(1).isSuccess).toBe(true);
   });
 
-  it("Returns isError after fetch is fails", () => {
+  it("Returns isError after fetch fails", async () => {
     const query = createQuery((id: number) => failure(id));
     query.fetch(1);
     jest.advanceTimersByTime(2000);
+    await Promise.resolve();
     expect(query.get(1).isError).toBe(true);
   });
 

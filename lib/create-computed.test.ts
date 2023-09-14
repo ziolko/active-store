@@ -1,7 +1,7 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import createState from "./create-state";
+import { createState } from "./create-state";
 import { createComputed } from "./create-computed";
-import { createSignal, execute } from "./core";
+import { createTopic, execute } from "./core";
 
 describe("createComputed", () => {
   it("Returns computed value", () => {
@@ -10,37 +10,37 @@ describe("createComputed", () => {
   });
 
   it("Updates returned value when one of dependencies changes", () => {
-    const { world, computed, valueSignal } = createTestContext();
-    const version = valueSignal.getVersion!();
+    const { world, computed, valueTopic } = createTestContext();
+    const version = valueTopic.getVersion!();
 
     world.set("DEMO");
     expect(computed.get().text).toBe("Hello DEMO");
-    expect(valueSignal.getVersion!()).toBe(version + 1);
+    expect(valueTopic.getVersion!()).toBe(version + 1);
   });
 
   it("Doesn't recompute value with each 'get' if there's no active subscription", () => {
-    const { computed, valueSignal } = createTestContext();
-    const version = valueSignal.getVersion!();
+    const { computed, valueTopic } = createTestContext();
+    const version = valueTopic.getVersion!();
 
     const result1 = computed.get();
     const result2 = computed.get();
 
     expect(result1).toBe(result2);
-    expect(valueSignal.getVersion!()).toBe(version);
+    expect(valueTopic.getVersion!()).toBe(version);
   });
 
   it("Updates version if there's no active subscription and one of dependencies changes", () => {
-    const { world, dependenciesSignal } = createTestContext();
-    const version = dependenciesSignal.getVersion!();
+    const { world, dependenciesTopic } = createTestContext();
+    const version = dependenciesTopic.getVersion!();
 
     world.set("TEST");
 
-    expect(dependenciesSignal.getVersion!()).toBe(version + 1);
+    expect(dependenciesTopic.getVersion!()).toBe(version + 1);
   });
 
   it("Subscribes to effects of nested dependencies", () => {
     const {
-      dependenciesSignal,
+      dependenciesTopic,
       computed,
       onNestedDependencySubscribed,
       onNestedDependencyUnsubscribed,
@@ -48,8 +48,8 @@ describe("createComputed", () => {
 
     computed.get();
 
-    const unsubscribe1 = dependenciesSignal.subscribe(() => null);
-    const unsubscribe2 = dependenciesSignal.subscribe(() => null);
+    const unsubscribe1 = dependenciesTopic.subscribe(() => null);
+    const unsubscribe2 = dependenciesTopic.subscribe(() => null);
 
     expect(onNestedDependencySubscribed).toBeCalledTimes(1);
     expect(onNestedDependencyUnsubscribed).toBeCalledTimes(0);
@@ -64,36 +64,36 @@ describe("createComputed", () => {
   });
 
   it("Doesn't recompute value with each 'get' if there's an active subscription", () => {
-    const { computed, valueSignal, dependenciesSignal } = createTestContext();
+    const { computed, valueTopic, dependenciesTopic } = createTestContext();
 
-    dependenciesSignal.subscribe(() => null);
+    dependenciesTopic.subscribe(() => null);
 
-    const version = valueSignal.getVersion!();
+    const version = valueTopic.getVersion!();
 
     const result1 = computed.get();
     const result2 = computed.get();
 
     expect(result1).toBe(result2);
-    expect(version).toBe(valueSignal.getVersion!());
+    expect(version).toBe(valueTopic.getVersion!());
   });
 
   it("Notifies about changes in one of dependencies if there's active subscription", () => {
-    const { world, dependenciesSignal } = createTestContext();
+    const { world, dependenciesTopic } = createTestContext();
     const listener = jest.fn();
 
-    dependenciesSignal.subscribe(listener);
+    dependenciesTopic.subscribe(listener);
 
-    const version = dependenciesSignal.getVersion!();
+    const version = dependenciesTopic.getVersion!();
 
     expect(listener).toHaveBeenCalledTimes(0);
 
     world.set("DEMO 1");
-    expect(dependenciesSignal.getVersion!()).toBe(version + 1);
+    expect(dependenciesTopic.getVersion!()).toBe(version + 1);
     expect(listener).toHaveBeenCalledTimes(1);
 
     world.set("DEMO 2");
     expect(listener).toHaveBeenCalledTimes(2);
-    expect(dependenciesSignal.getVersion!()).toBe(version + 2);
+    expect(dependenciesTopic.getVersion!()).toBe(version + 2);
   });
 });
 
@@ -104,34 +104,34 @@ function createTestContext() {
   const onNestedDependencySubscribed = jest.fn(
     () => onNestedDependencyUnsubscribed
   );
-  const nestedDependency = createSignal({
+  const nestedDependency = createTopic({
     getVersion: () => 0,
     onSubscribe: onNestedDependencySubscribed,
   });
   const computed = createComputed(() => {
-    execute.current.register(nestedDependency);
+    nestedDependency.register();
     return { text: `${hello.get()} ${world.get()}` };
   });
 
-  const { signals } = execute(() => computed.get());
+  const { topics } = execute(() => computed.get());
 
-  expect(signals.size).toEqual(2);
-  const signalsArray = Array.from(signals.values());
+  expect(topics.size).toEqual(2);
+  const topicsArray = Array.from(topics.values());
 
   // @ts-ignore
-  const dependenciesSignal = signalsArray.find((x) => x.isDependencies)!;
+  const dependenciesTopic = topicsArray.find((x) => x.isDependencies)!;
   // @ts-ignore
-  const valueSignal = signalsArray.find((x) => !x.isDependencies)!;
+  const valueTopic = topicsArray.find((x) => !x.isDependencies)!;
 
-  expect(dependenciesSignal).toBeDefined();
-  expect(valueSignal).toBeDefined();
+  expect(dependenciesTopic).toBeDefined();
+  expect(valueTopic).toBeDefined();
 
   return {
     hello,
     world,
     computed,
-    dependenciesSignal,
-    valueSignal,
+    dependenciesTopic: dependenciesTopic,
+    valueTopic: valueTopic,
     onNestedDependencySubscribed,
     onNestedDependencyUnsubscribed,
   };

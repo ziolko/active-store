@@ -1,4 +1,4 @@
-import { Signal, createSignal, execute } from "./core";
+import { Topic, createTopic, execute } from "./core";
 
 export interface CollectionOptions {
   inertia?: number;
@@ -11,7 +11,7 @@ export function createCollection<S extends (...params: any) => any>(
   type R = ReturnType<S>;
   type P = Parameters<S>;
 
-  type CacheEntry = { data: R; signal?: Signal };
+  type CacheEntry = { data: R; topic?: Topic };
   const cache = new Map<string, CacheEntry>();
 
   function createCacheEntry(key: string, params: any) {
@@ -21,7 +21,7 @@ export function createCollection<S extends (...params: any) => any>(
       return entry;
     }
 
-    entry.signal = createSignal({
+    entry.topic = createTopic({
       onSubscribe() {
         stopTimer();
         return startTimer;
@@ -42,7 +42,7 @@ export function createCollection<S extends (...params: any) => any>(
 
     function onTimeout() {
       cache.delete(key);
-      entry.signal?.notify();
+      entry.topic?.newVersion();
     }
 
     startTimer();
@@ -59,8 +59,8 @@ export function createCollection<S extends (...params: any) => any>(
         cache.set(key, result);
       }
 
-      if (result.signal) {
-        execute.current.register(result.signal);
+      if (result.topic) {
+        result.topic.register();
       }
 
       return result.data;

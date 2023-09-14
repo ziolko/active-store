@@ -1,39 +1,36 @@
-export type Signal = {
-  getId: () => number;
-  subscribe: (listener: (effect: Signal) => any) => () => void;
-  notify: () => void;
+export type Topic = {
+  register: () => void;
+
   getVersion: () => number;
+  newVersion: () => void;
+  subscribe: (listener: (topic: Topic) => any) => () => void;
 };
 
-type CreateSignalOptions = {
+type CreateTopicOptions = {
   getVersion?: () => number;
   onSubscribe?: () => (() => void) | void;
 };
 
-let lastSignalId = 0;
-
-export function createSignal({
+export function createTopic({
   onSubscribe,
   getVersion,
-}: CreateSignalOptions = {}): Signal {
+}: CreateTopicOptions = {}): Topic {
   let listenerCount = 0;
   let version = 0;
   let unsubscribe: (() => void) | void;
 
-  const signalId = lastSignalId++;
   const listeners = new Map();
 
   const result = {
-    getId() {
-      return signalId;
-    },
-    notify() {
+    register: () => currentTopics?.add(result as any),
+    getVersion: getVersion ?? (() => version),
+    newVersion() {
       version += 1;
       for (const entry of listeners) {
         entry[1](result);
       }
     },
-    subscribe(listener: (effect: Signal) => void) {
+    subscribe(listener: (effect: Topic) => void) {
       const id = listenerCount++;
 
       if (listeners.size === 0) {
@@ -56,34 +53,26 @@ export function createSignal({
         }
       };
     },
-    getVersion: getVersion ?? (() => version),
   };
   return result;
 }
 
+let currentTopics: Set<Topic> | null = null;
+
 export function execute<R>(selector: () => R): {
   value: R;
-  signals: Set<Signal>;
+  topics: Set<Topic>;
 } {
-  const previousSignals = execute.current.signals;
+  const previousTopics = currentTopics;
 
   try {
-    const signals = new Set<Signal>();
-    execute.current.signals = signals;
+    const topics = new Set<Topic>();
+    currentTopics = topics;
     const value = selector();
-    execute.current.signals = previousSignals;
-    return { value, signals } as any;
+    currentTopics = previousTopics;
+    return { value, topics } as any;
   } catch (error) {
-    execute.current.signals = previousSignals;
+    currentTopics = previousTopics;
     throw error;
   }
 }
-
-execute.current = {
-  signals: null as Set<Signal> | null,
-  register(signal: Signal) {
-    if (signal && execute.current.signals) {
-      execute.current.signals.add(signal);
-    }
-  },
-};
