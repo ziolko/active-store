@@ -1,4 +1,4 @@
-import { createTopic, execute } from "./core";
+import { createTopic, compute } from "./core";
 import { createCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 import { createState } from "./create-state";
@@ -19,44 +19,26 @@ export function createComputed<S extends (...args: any) => any>(selector: S) {
 }
 
 function createComputedSingle<R>(selector: () => R) {
-  const dependencies = createDependenciesTracker(onDependencyUpdated);
-  const cache = createState({ value: null as R, version: 0 });
-  const state = { isSubscribed: false, hasAnyDependencyChanged: false };
+  const state = {
+    value: undefined as R,
+    isSubscribed: false,
+    hasAnyDependencyChanged: false,
+  };
 
-  function onDependencyUpdated() {
+  const dependencies = createDependenciesTracker(() => {
     state.hasAnyDependencyChanged = true;
-    topic.newVersion();
-  }
-
-  function updateCache() {
-    if (state.isSubscribed && !state.hasAnyDependencyChanged) {
-      return;
-    }
-
-    if (!state.isSubscribed && !dependencies.hasChanged()) {
-      return;
-    }
-
-    const { value, topics } = execute(selector);
-
-    dependencies.update(topics);
-
-    if (state.isSubscribed) {
-      dependencies.subscribe();
-    }
-
-    cache.set({ value, version: cache.get().version + 1 });
-    state.hasAnyDependencyChanged = false;
-  }
+    topic.notify();
+  });
 
   const topic = createTopic({
     onSubscribe() {
       state.isSubscribed = true;
 
       if (dependencies.hasChanged()) {
-        const { value, topics } = execute(selector);
+        const { value, topics } = compute(selector);
         dependencies.update(topics);
-        cache.set({ value, version: cache.get().version + 1 });
+        state.value = value;
+        topic.notify();
       }
 
       dependencies.subscribe();
@@ -67,18 +49,31 @@ function createComputedSingle<R>(selector: () => R) {
         dependencies.unsubscribe();
       };
     },
-    getVersion() {
-      updateCache();
-      return cache.get().version;
+    get() {
+      if (state.isSubscribed && !state.hasAnyDependencyChanged) {
+        return state.value;
+      }
+
+      if (!state.isSubscribed && !dependencies.hasChanged()) {
+        return state.value;
+      }
+
+      const { value, topics } = compute(selector);
+
+      dependencies.update(topics);
+
+      if (state.isSubscribed) {
+        dependencies.subscribe();
+      }
+
+      state.value = value;
+      state.hasAnyDependencyChanged = false;
+      return value;
     },
   });
 
   // @ts-ignore - used for testing
   topic.isDependencies = true;
 
-  return (): R => {
-    topic.register();
-    updateCache();
-    return cache.get().value;
-  };
+  return () => topic.get() as R;
 }

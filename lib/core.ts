@@ -1,30 +1,38 @@
 export type Topic = {
-  register: () => void;
-
-  getVersion: () => number;
-  newVersion: () => void;
+  get: () => unknown;
+  notify: () => void;
   subscribe: (listener: (topic: Topic) => any) => () => void;
 };
 
 type CreateTopicOptions = {
-  getVersion?: () => number;
+  get?: () => any;
   onSubscribe?: () => (() => void) | void;
 };
 
-export function createTopic({
-  onSubscribe,
-  getVersion,
-}: CreateTopicOptions = {}): Topic {
+export function createTopic(options: CreateTopicOptions = {}) {
   let listenerCount = 0;
   let version = 0;
   let unsubscribe: (() => void) | void;
 
   const listeners = new Map();
 
-  const result = {
-    register: () => currentTopics?.add(result as any),
-    getVersion: getVersion ?? (() => version),
-    newVersion() {
+  const result: Topic = {
+    get() {
+      currentTopics?.add(result as any);
+
+      if (!options?.get) {
+        return version;
+      }
+
+      const previousTopics = currentTopics;
+      try {
+        currentTopics = null;
+        return options.get();
+      } finally {
+        currentTopics = previousTopics;
+      }
+    },
+    notify() {
       version += 1;
       for (const entry of listeners) {
         entry[1](result);
@@ -34,7 +42,7 @@ export function createTopic({
       const id = listenerCount++;
 
       if (listeners.size === 0) {
-        unsubscribe = onSubscribe?.();
+        unsubscribe = options?.onSubscribe?.();
       }
 
       listeners.set(id, listener);
@@ -59,7 +67,7 @@ export function createTopic({
 
 let currentTopics: Set<Topic> | null = null;
 
-export function execute<R>(selector: () => R): {
+export function compute<R>(selector: () => R): {
   value: R;
   topics: Set<Topic>;
 } {
@@ -68,11 +76,8 @@ export function execute<R>(selector: () => R): {
   try {
     const topics = new Set<Topic>();
     currentTopics = topics;
-    const value = selector();
+    return { value: selector(), topics } as any;
+  } finally {
     currentTopics = previousTopics;
-    return { value, topics } as any;
-  } catch (error) {
-    currentTopics = previousTopics;
-    throw error;
   }
 }

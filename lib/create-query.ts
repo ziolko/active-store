@@ -1,4 +1,4 @@
-import { createTopic, execute } from "./core";
+import { createTopic, compute } from "./core";
 import { createCollection } from "./create-collection";
 import { createState } from "./create-state";
 
@@ -84,7 +84,7 @@ function createQuerySingle<R>(
 
   return {
     get() {
-      topic.register();
+      topic.get();
       return state.get();
     },
     fetch,

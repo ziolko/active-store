@@ -7,7 +7,7 @@ import {
 } from "react";
 import shallowequal from "shallowequal";
 
-import { execute } from "./core";
+import { compute } from "./core";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
 export function useData<
@@ -74,7 +74,7 @@ function createUseSelectorState() {
       };
     },
     getSnapshot(selector: () => any) {
-      const { value, topics } = execute(selector);
+      const { value, topics } = compute(selector);
       dependencies.update(topics);
 
       if (onUpdated) {

@@ -1,6 +1,6 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { createCollection } from "./create-collection";
-import { execute } from "./core";
+import { compute } from "./core";
 
 describe("createCollection", () => {
   jest.useFakeTimers();
@@ -49,7 +49,7 @@ describe("createCollection", () => {
     const value = collection.get(1);
     expect(collection.get(1)).toBe(value);
 
-    const { topics } = execute(() => collection.get(1));
+    const { topics } = compute(() => collection.get(1));
     const unsubscribes = [];
 
     for (const topic of topics) {

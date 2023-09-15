@@ -2,7 +2,7 @@ import { Topic } from "./core";
 
 interface CachedTopic {
   unsubscribe?: () => void;
-  version?: number;
+  value?: unknown;
 }
 
 export function createDependenciesTracker(onDependencyChanged: () => void) {
@@ -20,7 +20,7 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
       }
 
       for (const topic of dependencies) {
-        if (cache.get(topic)?.version !== topic.getVersion?.()) {
+        if (cache.get(topic)?.value !== topic.get?.()) {
           return true;
         }
       }
@@ -36,7 +36,7 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
           cache.set(topic, cached);
         }
 
-        cached.version = topic.getVersion?.();
+        cached.value = topic.get?.();
       }
 
       // Search for topics that are no longer there

@@ -1,12 +1,12 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { createTopic as createTopic, execute } from "./core";
+import { createTopic as createTopic, compute } from "./core";
 
 describe("createTopic", () => {
   it("Calls subscribed function", () => {
     const listener = jest.fn();
     const topic = createTopic();
     topic.subscribe(listener);
-    topic.newVersion();
+    topic.notify();
     expect(listener).toBeCalledTimes(1);
   });
 
@@ -15,30 +15,30 @@ describe("createTopic", () => {
     const topic = createTopic();
     const unsubscribe = topic.subscribe(listener);
     unsubscribe();
-    topic.newVersion();
+    topic.notify();
     expect(listener).not.toBeCalled();
   });
 });
 
 describe("execute", () => {
   it("Returns value from selector", () => {
-    const { value } = execute(() => "test-value");
+    const { value } = compute(() => "test-value");
     expect(value).toEqual("test-value");
   });
 
   it("Returns registered topic from selector", () => {
-    const topic = createTopic({ getVersion: () => 1 });
-    const { topics } = execute(() => topic.register());
+    const topic = createTopic({ get: () => 1 });
+    const { topics } = compute(() => topic.get());
     expect(topics.size).toEqual(1);
-    expect(topics.values().next().value.getVersion()).toEqual(1);
+    expect(topics.values().next().value.get()).toEqual(1);
   });
 
   it("Registers the same topic once even if registered multiple times", () => {
     const topic = createTopic();
-    const { topics } = execute(() => {
-      topic.register();
-      topic.register();
-      topic.register();
+    const { topics } = compute(() => {
+      topic.get();
+      topic.get();
+      topic.get();
     });
     expect(topics.size).toEqual(1);
   });
@@ -48,6 +48,6 @@ describe("execute", () => {
       throw new Error("test-error");
     }
 
-    expect(() => execute(selector)).toThrow();
+    expect(() => compute(selector)).toThrow();
   });
 });

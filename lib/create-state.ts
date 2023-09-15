@@ -2,17 +2,16 @@ import { createTopic } from "./core";
 
 export function createState<V>(initialValue: V) {
   let value = initialValue;
-  const topic = createTopic();
+  const topic = createTopic({ get: () => value });
 
   return {
     get(): V {
-      topic.register();
-      return value;
+      return topic.get() as V;
     },
     set(newValue: V) {
       if (!Object.is(newValue, value)) {
         value = newValue;
-        topic.newVersion();
+        topic.notify();
       }
     },
   };

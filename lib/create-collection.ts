@@ -1,4 +1,4 @@
-import { Topic, createTopic, execute } from "./core";
+import { Topic, createTopic, compute } from "./core";
 
 export interface CollectionOptions {
   inertia?: number;
@@ -42,7 +42,7 @@ export function createCollection<S extends (...params: any) => any>(
 
     function onTimeout() {
       cache.delete(key);
-      entry.topic?.newVersion();
+      entry.topic?.notify();
     }
 
     startTimer();
@@ -60,7 +60,7 @@ export function createCollection<S extends (...params: any) => any>(
       }
 
       if (result.topic) {
-        result.topic.register();
+        result.topic.get();
       }
 
       return result.data;
