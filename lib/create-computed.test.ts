@@ -1,7 +1,7 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { createState } from "./create-state";
 import { createComputed } from "./create-computed";
-import { createTopic, compute } from "./core";
+import { createExternalState, compute } from "./core";
 
 describe("createComputed", () => {
   it("Returns computed value", () => {
@@ -91,15 +91,16 @@ function createTestContext() {
   const onNestedDependencySubscribed = jest.fn(
     () => onNestedDependencyUnsubscribed
   );
-  const nestedDependency = createTopic(() => 0, {
-    onSubscribe: onNestedDependencySubscribed,
-  });
+  const nestedDependency = createExternalState(
+    () => 0,
+    onNestedDependencySubscribed
+  );
   const computed = createComputed(() => {
     nestedDependency.get();
     return { text: `${hello.get()} ${world.get()}` };
   });
 
-  const { topics } = compute(() => computed.get());
+  const { dependencies: topics } = compute(() => computed.get());
 
   expect(topics.size).toEqual(1);
   const topic = topics.values().next().value;

@@ -1,4 +1,4 @@
-import { createTopic, compute } from "./core";
+import { createExternalState, compute } from "./core";
 import { createCollection } from "./create-collection";
 import { createState } from "./create-state";
 
@@ -54,28 +54,37 @@ function createQuerySingle<R>(
   options: QueryOptions
 ) {
   let currentPromise: any = null;
-  const state = createState<State<R>>(getStatuses(Status.IDLE));
+  let currentState: State<R> = getStatuses<R>(Status.IDLE);
 
-  const topic = createTopic(() => null, {
-    onSubscribe: () => void setTimeout(fetch, 0), // set timeout to avoid "The result of getSnapshot should be cached"
-  });
+  const state = createExternalState(
+    function get() {
+      return currentState;
+    },
+    function onSubscribe() {
+      setTimeout(fetch, 0);
+      return () => null;
+    }
+  );
 
   function fetch() {
     const value = factory();
     currentPromise = value;
-    const current = state.get();
+    const current = currentState;
 
-    state.set(getStatuses(Status.LOADING, current.data, current.error));
+    currentState = getStatuses(Status.LOADING, current.data, current.error);
+    state.notify();
 
     value.then(
       (data: any) => {
         if (value === currentPromise) {
-          state.set(getStatuses(Status.SUCCESS, data));
+          currentState = getStatuses(Status.SUCCESS, data);
+          state.notify();
         }
       },
       (error: any) => {
         if (value === currentPromise) {
-          state.set(getStatuses(Status.ERROR, undefined, error));
+          currentState = getStatuses(Status.ERROR, undefined, error);
+          state.notify();
         }
       }
     );
@@ -83,10 +92,7 @@ function createQuerySingle<R>(
   }
 
   return {
-    get() {
-      topic.get();
-      return state.get();
-    },
+    get: state.get,
     fetch,
   };
 }

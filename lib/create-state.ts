@@ -1,8 +1,16 @@
-import { createTopic } from "./core";
+import { createExternalState } from "./core";
 
 export function createState<V>(initialValue: V) {
   let value = initialValue;
-  const topic = createTopic(() => value);
+  let onValueChanged: null | (() => void) = null;
+
+  const topic = createExternalState(
+    () => value,
+    (emitValueChanged) => {
+      onValueChanged = emitValueChanged;
+      return () => (onValueChanged = null);
+    }
+  );
 
   return {
     get(): V {
@@ -11,7 +19,7 @@ export function createState<V>(initialValue: V) {
     set(newValue: V) {
       if (!Object.is(newValue, value)) {
         value = newValue;
-        topic.notify();
+        onValueChanged?.();
       }
     },
   };

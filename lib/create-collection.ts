@@ -1,4 +1,4 @@
-import { Topic, createTopic, compute } from "./core";
+import { Dependency, createExternalState, compute } from "./core";
 
 export interface CollectionOptions {
   inertia?: number;
@@ -11,7 +11,7 @@ export function createCollection<S extends (...params: any) => any>(
   type R = ReturnType<S>;
   type P = Parameters<S>;
 
-  type CacheEntry = { data: R; topic?: Topic };
+  type CacheEntry = { data: R; topic?: Dependency };
   const cache = new Map<string, CacheEntry>();
 
   function createCacheEntry(key: string, params: any) {
@@ -22,12 +22,13 @@ export function createCollection<S extends (...params: any) => any>(
     }
 
     let version = 0;
-    entry.topic = createTopic(() => version, {
-      onSubscribe() {
+    entry.topic = createExternalState(
+      () => version,
+      () => {
         stopTimer();
         return startTimer;
-      },
-    });
+      }
+    );
 
     let timeoutHandler: number | undefined;
 
@@ -44,7 +45,6 @@ export function createCollection<S extends (...params: any) => any>(
     function onTimeout() {
       cache.delete(key);
       version += 1;
-      entry.topic?.notify();
     }
 
     startTimer();
@@ -61,9 +61,7 @@ export function createCollection<S extends (...params: any) => any>(
         cache.set(key, result);
       }
 
-      if (result.topic) {
-        result.topic.get();
-      }
+      result.topic?.get();
 
       return result.data;
     },

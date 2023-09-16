@@ -1,21 +1,29 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { createTopic as createTopic, compute } from "./core";
+import { createExternalState as createExternalState, compute } from "./core";
 
 describe("createTopic", () => {
   it("Calls subscribed function", () => {
     const listener = jest.fn();
-    const topic = createTopic(() => 1);
-    topic.subscribe(listener);
-    topic.notify();
+    let notifyTopic: () => void;
+    const state = createExternalState(
+      () => 1,
+      (notify) => (notifyTopic = notify)
+    );
+    state.subscribe(listener);
+    notifyTopic!();
     expect(listener).toBeCalledTimes(1);
   });
 
   it("Doesn't call subscribed function if unsubscribed", () => {
     const listener = jest.fn();
-    const topic = createTopic(() => 1);
-    const unsubscribe = topic.subscribe(listener);
+    let notifyTopic: () => void;
+    const state = createExternalState(
+      () => 1,
+      (notify) => (notifyTopic = notify)
+    );
+    const unsubscribe = state.subscribe(listener);
     unsubscribe();
-    topic.notify();
+    notifyTopic!();
     expect(listener).not.toBeCalled();
   });
 });
@@ -26,21 +34,27 @@ describe("execute", () => {
     expect(value).toEqual("test-value");
   });
 
-  it("Returns registered topic from selector", () => {
-    const topic = createTopic(() => 1);
-    const { topics } = compute(() => topic.get());
-    expect(topics.size).toEqual(1);
-    expect(topics.values().next().value.get()).toEqual(1);
+  it("Returns registered dependency from selector", () => {
+    const state = createExternalState(
+      () => 1,
+      () => () => null
+    );
+    const { dependencies } = compute(() => state.get());
+    expect(dependencies.size).toEqual(1);
+    expect(dependencies.values().next().value.get()).toEqual(1);
   });
 
-  it("Registers the same topic once even if registered multiple times", () => {
-    const topic = createTopic(() => 1);
-    const { topics } = compute(() => {
-      topic.get();
-      topic.get();
-      topic.get();
+  it("Registers the same dependency once even if registered multiple times", () => {
+    const state = createExternalState(
+      () => 1,
+      () => () => null
+    );
+    const { dependencies } = compute(() => {
+      state.get();
+      state.get();
+      state.get();
     });
-    expect(topics.size).toEqual(1);
+    expect(dependencies.size).toEqual(1);
   });
 
   it("Handles exceptions gracefully", () => {

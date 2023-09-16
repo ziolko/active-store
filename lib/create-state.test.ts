@@ -1,6 +1,6 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { createState } from "./create-state";
-import { Topic, compute } from "./core";
+import { Dependency, compute } from "./core";
 
 describe("createState", () => {
   it("Returns initial value", () => {
@@ -16,14 +16,14 @@ describe("createState", () => {
 
   it("Registers topics when run", () => {
     const state = createState("test-value");
-    const { topics } = compute(() => state.get());
-    expect(topics.size).toEqual(1);
+    const { dependencies } = compute(() => state.get());
+    expect(dependencies.size).toEqual(1);
   });
 
   it("Notifies registered subscriber and update version when value changed", () => {
     const state = createState("test-value");
-    const { topics } = compute(() => state.get());
-    const topic: Topic = topics.values().next().value;
+    const { dependencies: topics } = compute(() => state.get());
+    const topic: Dependency = topics.values().next().value;
 
     const listener = jest.fn();
     const version = topic.get!();
@@ -35,8 +35,8 @@ describe("createState", () => {
 
   it("Doesn't notify subscribers if new and old values are equal", () => {
     const state = createState("test-value");
-    const { topics } = compute(() => state.get());
-    const topic: Topic = topics.values().next().value;
+    const { dependencies: topics } = compute(() => state.get());
+    const topic: Dependency = topics.values().next().value;
 
     const listener = jest.fn();
     topic.subscribe(listener);

@@ -74,7 +74,7 @@ function createUseSelectorState() {
       };
     },
     getSnapshot(selector: () => any) {
-      const { value, topics } = compute(selector);
+      const { value, dependencies: topics } = compute(selector);
       dependencies.update(topics);
 
       if (onUpdated) {

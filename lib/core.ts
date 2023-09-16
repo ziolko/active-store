@@ -1,41 +1,29 @@
-export type Topic = {
-  get: () => unknown;
-  notify: () => void;
-  subscribe: (listener: (topic: Topic) => any) => () => void;
-};
-
-type CreateTopicOptions = {
-  onSubscribe?: () => (() => void) | void;
-};
-
-export function createTopic(get: () => any, options: CreateTopicOptions = {}) {
+export function createExternalState<R = any>(
+  get: () => R,
+  onSubscribe: (notify: () => void) => () => void
+) {
   let listenerCount = 0;
   let unsubscribe: (() => void) | void;
 
   const listeners = new Map();
 
-  const result: Topic = {
-    get() {
-      currentTopics?.add(result as any);
+  function notify() {
+    for (const entry of listeners) {
+      entry[1](result);
+    }
+  }
 
-      const previousTopics = currentTopics;
-      try {
-        currentTopics = null;
-        return get();
-      } finally {
-        currentTopics = previousTopics;
-      }
+  const result = {
+    get() {
+      currentDependencies?.add(result as any);
+      return get();
     },
-    notify() {
-      for (const entry of listeners) {
-        entry[1](result);
-      }
-    },
-    subscribe(listener: (effect: Topic) => void) {
+    notify,
+    subscribe(listener: (dependency: Dependency) => void) {
       const id = listenerCount++;
 
       if (listeners.size === 0) {
-        unsubscribe = options?.onSubscribe?.();
+        unsubscribe = onSubscribe?.(notify);
       }
 
       listeners.set(id, listener);
@@ -58,19 +46,28 @@ export function createTopic(get: () => any, options: CreateTopicOptions = {}) {
   return result;
 }
 
-let currentTopics: Set<Topic> | null = null;
+export interface Dependency {
+  get: () => unknown;
+  subscribe: (listener: (dependency: Dependency) => any) => () => void;
+}
 
-export function compute<R>(selector: () => R): {
-  value: R;
-  topics: Set<Topic>;
-} {
-  const previousTopics = currentTopics;
+let currentDependencies: Set<Dependency> | null = null;
+
+export interface ComputeOptions {
+  trackDependencies?: boolean;
+}
+
+export function compute<R>(
+  selector: () => R,
+  { trackDependencies = true }: ComputeOptions = {}
+) {
+  const previousDependencies = currentDependencies;
 
   try {
-    const topics = new Set<Topic>();
-    currentTopics = topics;
-    return { value: selector(), topics } as any;
+    const dependencies = trackDependencies ? new Set<Dependency>() : null;
+    currentDependencies = dependencies;
+    return { value: selector() as R, dependencies: dependencies ?? new Set() };
   } finally {
-    currentTopics = previousTopics;
+    currentDependencies = previousDependencies;
   }
 }

@@ -1,4 +1,4 @@
-import { createTopic, compute } from "./core";
+import { createExternalState, compute } from "./core";
 import { createCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
@@ -22,15 +22,16 @@ function createComputedSingle<R>(selector: () => R) {
     value: undefined as R,
     isSubscribed: false,
     hasAnyDependencyChanged: false,
+    notifyAboutChanges: null as null | (() => void),
   };
 
   const dependencies = createDependenciesTracker(() => {
     state.hasAnyDependencyChanged = true;
-    topic.notify();
+    state.notifyAboutChanges?.();
   });
 
-  const topic = createTopic(
-    () => {
+  const topic = createExternalState(
+    function get() {
       if (state.isSubscribed && !state.hasAnyDependencyChanged) {
         return state.value;
       }
@@ -39,7 +40,7 @@ function createComputedSingle<R>(selector: () => R) {
         return state.value;
       }
 
-      const { value, topics } = compute(selector);
+      const { value, dependencies: topics } = compute(selector);
 
       dependencies.update(topics);
 
@@ -51,25 +52,25 @@ function createComputedSingle<R>(selector: () => R) {
       state.hasAnyDependencyChanged = false;
       return value;
     },
-    {
-      onSubscribe() {
-        state.isSubscribed = true;
+    function onSubscribe(notifyAboutChanges) {
+      state.isSubscribed = true;
+      state.notifyAboutChanges = notifyAboutChanges;
 
-        if (dependencies.hasChanged()) {
-          const { value, topics } = compute(selector);
-          dependencies.update(topics);
-          state.value = value;
-          topic.notify();
-        }
+      if (dependencies.hasChanged()) {
+        const { value, dependencies: topics } = compute(selector);
+        dependencies.update(topics);
+        state.value = value;
+        notifyAboutChanges();
+      }
 
-        dependencies.subscribe();
-        state.hasAnyDependencyChanged = false;
+      dependencies.subscribe();
+      state.hasAnyDependencyChanged = false;
 
-        return () => {
-          state.isSubscribed = false;
-          dependencies.unsubscribe();
-        };
-      },
+      return function unsbuscribe() {
+        state.isSubscribed = false;
+        state.notifyAboutChanges = null;
+        dependencies.unsubscribe();
+      };
     }
   );
 

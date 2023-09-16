@@ -49,7 +49,7 @@ describe("createCollection", () => {
     const value = collection.get(1);
     expect(collection.get(1)).toBe(value);
 
-    const { topics } = compute(() => collection.get(1));
+    const { dependencies: topics } = compute(() => collection.get(1));
     const unsubscribes = [];
 
     for (const topic of topics) {
