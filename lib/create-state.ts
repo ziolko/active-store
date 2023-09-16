@@ -2,7 +2,7 @@ import { createTopic } from "./core";
 
 export function createState<V>(initialValue: V) {
   let value = initialValue;
-  const topic = createTopic({ get: () => value });
+  const topic = createTopic(() => value);
 
   return {
     get(): V {

@@ -91,8 +91,7 @@ function createTestContext() {
   const onNestedDependencySubscribed = jest.fn(
     () => onNestedDependencyUnsubscribed
   );
-  const nestedDependency = createTopic({
-    get: () => 0,
+  const nestedDependency = createTopic(() => 0, {
     onSubscribe: onNestedDependencySubscribed,
   });
   const computed = createComputed(() => {

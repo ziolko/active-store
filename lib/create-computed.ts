@@ -1,7 +1,6 @@
 import { createTopic, compute } from "./core";
 import { createCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
-import { createState } from "./create-state";
 
 export function createComputed<S extends (...args: any) => any>(selector: S) {
   type P = Parameters<S>;
@@ -30,26 +29,8 @@ function createComputedSingle<R>(selector: () => R) {
     topic.notify();
   });
 
-  const topic = createTopic({
-    onSubscribe() {
-      state.isSubscribed = true;
-
-      if (dependencies.hasChanged()) {
-        const { value, topics } = compute(selector);
-        dependencies.update(topics);
-        state.value = value;
-        topic.notify();
-      }
-
-      dependencies.subscribe();
-      state.hasAnyDependencyChanged = false;
-
-      return () => {
-        state.isSubscribed = false;
-        dependencies.unsubscribe();
-      };
-    },
-    get() {
+  const topic = createTopic(
+    () => {
       if (state.isSubscribed && !state.hasAnyDependencyChanged) {
         return state.value;
       }
@@ -70,10 +51,27 @@ function createComputedSingle<R>(selector: () => R) {
       state.hasAnyDependencyChanged = false;
       return value;
     },
-  });
+    {
+      onSubscribe() {
+        state.isSubscribed = true;
 
-  // @ts-ignore - used for testing
-  topic.isDependencies = true;
+        if (dependencies.hasChanged()) {
+          const { value, topics } = compute(selector);
+          dependencies.update(topics);
+          state.value = value;
+          topic.notify();
+        }
+
+        dependencies.subscribe();
+        state.hasAnyDependencyChanged = false;
+
+        return () => {
+          state.isSubscribed = false;
+          dependencies.unsubscribe();
+        };
+      },
+    }
+  );
 
   return () => topic.get() as R;
 }

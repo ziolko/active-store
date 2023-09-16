@@ -4,7 +4,7 @@ import { createTopic as createTopic, compute } from "./core";
 describe("createTopic", () => {
   it("Calls subscribed function", () => {
     const listener = jest.fn();
-    const topic = createTopic();
+    const topic = createTopic(() => 1);
     topic.subscribe(listener);
     topic.notify();
     expect(listener).toBeCalledTimes(1);
@@ -12,7 +12,7 @@ describe("createTopic", () => {
 
   it("Doesn't call subscribed function if unsubscribed", () => {
     const listener = jest.fn();
-    const topic = createTopic();
+    const topic = createTopic(() => 1);
     const unsubscribe = topic.subscribe(listener);
     unsubscribe();
     topic.notify();
@@ -27,14 +27,14 @@ describe("execute", () => {
   });
 
   it("Returns registered topic from selector", () => {
-    const topic = createTopic({ get: () => 1 });
+    const topic = createTopic(() => 1);
     const { topics } = compute(() => topic.get());
     expect(topics.size).toEqual(1);
     expect(topics.values().next().value.get()).toEqual(1);
   });
 
   it("Registers the same topic once even if registered multiple times", () => {
-    const topic = createTopic();
+    const topic = createTopic(() => 1);
     const { topics } = compute(() => {
       topic.get();
       topic.get();

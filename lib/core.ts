@@ -5,13 +5,11 @@ export type Topic = {
 };
 
 type CreateTopicOptions = {
-  get?: () => any;
   onSubscribe?: () => (() => void) | void;
 };
 
-export function createTopic(options: CreateTopicOptions = {}) {
+export function createTopic(get: () => any, options: CreateTopicOptions = {}) {
   let listenerCount = 0;
-  let version = 0;
   let unsubscribe: (() => void) | void;
 
   const listeners = new Map();
@@ -20,20 +18,15 @@ export function createTopic(options: CreateTopicOptions = {}) {
     get() {
       currentTopics?.add(result as any);
 
-      if (!options?.get) {
-        return version;
-      }
-
       const previousTopics = currentTopics;
       try {
         currentTopics = null;
-        return options.get();
+        return get();
       } finally {
         currentTopics = previousTopics;
       }
     },
     notify() {
-      version += 1;
       for (const entry of listeners) {
         entry[1](result);
       }

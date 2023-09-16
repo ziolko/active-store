@@ -21,7 +21,8 @@ export function createCollection<S extends (...params: any) => any>(
       return entry;
     }
 
-    entry.topic = createTopic({
+    let version = 0;
+    entry.topic = createTopic(() => version, {
       onSubscribe() {
         stopTimer();
         return startTimer;
@@ -42,6 +43,7 @@ export function createCollection<S extends (...params: any) => any>(
 
     function onTimeout() {
       cache.delete(key);
+      version += 1;
       entry.topic?.notify();
     }
 

@@ -56,7 +56,7 @@ function createQuerySingle<R>(
   let currentPromise: any = null;
   const state = createState<State<R>>(getStatuses(Status.IDLE));
 
-  const topic = createTopic({
+  const topic = createTopic(() => null, {
     onSubscribe: () => void setTimeout(fetch, 0), // set timeout to avoid "The result of getSnapshot should be cached"
   });
 
