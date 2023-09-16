@@ -7,7 +7,7 @@
     "test:watch": "jest --watch",
     "start": "vite",
     "build": "vite build",
-    "prepublish": "vite build"
+    "prepublishOnly": "vite build"
   },
   "type": "module",
   "files": [
