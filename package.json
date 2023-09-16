@@ -1,12 +1,13 @@
 {
   "name": "active-store",
-  "version": "0.0.9",
+  "version": "0.0.20",
   "description": "",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
     "start": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "prepublish": "vite build"
   },
   "type": "module",
   "files": [
