@@ -2,24 +2,18 @@ import { createExternalState } from "./core";
 
 export function createState<V>(initialValue: V) {
   let value = initialValue;
-  let onValueChanged: null | (() => void) = null;
 
   const topic = createExternalState(
     () => value,
-    (emitValueChanged) => {
-      onValueChanged = emitValueChanged;
-      return () => (onValueChanged = null);
-    }
+    (emit) => () => null
   );
 
   return {
-    get(): V {
-      return topic.get() as V;
-    },
+    get: topic.get,
     set(newValue: V) {
       if (!Object.is(newValue, value)) {
         value = newValue;
-        onValueChanged?.();
+        topic.notify();
       }
     },
   };
