@@ -43,13 +43,13 @@ function createComputedSingle<R>(selector: () => R) {
       const { value, dependencies: topics } = compute(selector);
 
       dependencies.update(topics);
+      state.hasAnyDependencyChanged = false;
+      state.value = value;
 
       if (state.isSubscribed) {
         dependencies.subscribe();
       }
 
-      state.value = value;
-      state.hasAnyDependencyChanged = false;
       return value;
     },
     function onSubscribe(notifyAboutChanges) {

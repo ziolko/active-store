@@ -21,12 +21,12 @@ export function createExternalState<R = any>(
     notify,
     subscribe(listener: (dependency: Dependency) => void) {
       const id = listenerCount++;
+      listeners.set(id, listener);
 
-      if (listeners.size === 0) {
+      if (listeners.size === 1) {
         unsubscribe = onSubscribe?.(notify);
       }
 
-      listeners.set(id, listener);
       let hasUnsubscribed = false;
       return () => {
         if (hasUnsubscribed) {
