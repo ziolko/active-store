@@ -60,7 +60,7 @@ export function useAsyncAction<S extends () => (...args: any) => Promise<any>>(
 
 function createUseSelectorState() {
   let onUpdated: any;
-  let dependencies = createDependenciesTracker(() => onUpdated());
+  let dependencies = createDependenciesTracker(() => onUpdated?.());
   let cachedValue: any = undefined;
   let subscriptionsCount = 0;
 

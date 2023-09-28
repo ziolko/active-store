@@ -61,7 +61,7 @@ function createQuerySingle<R>(
       return currentState;
     },
     function onSubscribe() {
-      fetch();
+      setTimeout(() => fetch(), 0);
       return () => null;
     }
   );
