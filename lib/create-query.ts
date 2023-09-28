@@ -23,7 +23,7 @@ export interface QueryOptions {
   ttl?: number;
 }
 
-export function createQuery<S extends (...args: any) => any>(
+export function createQuery<S extends (...args: any) => Promise<any>>(
   factory: S,
   options: QueryOptions = {}
 ) {
