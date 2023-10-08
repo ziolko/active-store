@@ -12,7 +12,10 @@ export function createComputed<S extends (...args: any) => any>(selector: S) {
 
   return {
     get(...params: P): R {
-      return collection.get(...params)();
+      return collection.get(...params).get();
+    },
+    getSubscribe(...params: P) {
+      return collection.get(...params).subscribe;
     },
   };
 }
@@ -74,5 +77,5 @@ function createComputedSingle<R>(selector: () => R) {
     }
   );
 
-  return () => topic.get() as R;
+  return { get: () => topic.get() as R, subscribe: topic.subscribe };
 }

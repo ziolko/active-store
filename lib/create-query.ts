@@ -55,6 +55,7 @@ function createQuerySingle<R>(
 ) {
   let currentPromise: any = null;
   let currentState: State<R> = getStatuses<R>(Status.IDLE);
+  let timeoutHandle: number | null = null;
 
   const state = createExternalState(
     function get() {
@@ -62,11 +63,25 @@ function createQuerySingle<R>(
     },
     function onSubscribe() {
       setTimeout(() => fetch(), 0);
-      return () => null;
+      if (options.ttl) {
+        timeoutHandle = setTimeout(() => fetch(), options.ttl) as any;
+      }
+      return () => {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+        timeoutHandle = null;
+        return null;
+      };
     }
   );
 
   function fetch() {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+      timeoutHandle = setTimeout(() => fetch(), options.ttl) as any;
+    }
+
     const value = factory();
     currentPromise = value;
     const current = currentState;

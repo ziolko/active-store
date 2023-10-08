@@ -5,7 +5,7 @@ describe("createQuery", () => {
   jest.useFakeTimers();
 
   it("Returns idle result by default", () => {
-    const query = createQuery((id: number) => ({ id }));
+    const query = createQuery(async (id: number) => ({ id }));
     expect(query.get(1).isIdle).toBe(true);
   });
 
