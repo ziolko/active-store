@@ -6,7 +6,7 @@ import { createDependenciesTracker } from "./create-dependencies-tracker";
 
 export function useSelector<
   R extends NoFunctionsAllowed<R extends (...props: any) => any ? never : R>
->(selector: () => R) {
+>(selector: () => R): R {
   const state = useMemo(createUseSelectorState, []);
 
   return useSyncExternalStore(state.subscribe, () =>
