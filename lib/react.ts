@@ -1,19 +1,17 @@
-import { useSyncExternalStore, useMemo, createContext } from "react";
+import { useSyncExternalStore, useMemo } from "react";
 import shallowequal from "shallowequal";
 
 import { compute } from "./core";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
-export function createReactStore<S>(store: S) {
-  return function useSelector<
-    R extends NoFunctionsAllowed<R extends (...props: any) => any ? never : R>
-  >(selector: (store: S) => R): R {
-    const state = useMemo(createUseSelectorState, []);
+export function useSelector<
+  R extends NoFunctionsAllowed<R extends (...props: any) => any ? never : R>
+>(selector: () => R): R {
+  const state = useMemo(createUseSelectorState, []);
 
-    return useSyncExternalStore(state.subscribe, () =>
-      state.getSnapshot(() => selector(store))
-    );
-  };
+  return useSyncExternalStore(state.subscribe, () =>
+    state.getSnapshot(selector)
+  );
 }
 
 function createUseSelectorState() {
