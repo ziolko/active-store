@@ -6,22 +6,22 @@ import { createExternalState, compute } from "./core";
 describe("createComputed", () => {
   it("Returns computed value", () => {
     const { computed } = createTestContext();
-    expect(computed.get().text).toEqual("Hello World");
+    expect(computed().get().text).toEqual("Hello World");
   });
 
   it("Updates returned value when one of dependencies changes", () => {
     const { world, computed } = createTestContext();
 
     world.set("DEMO");
-    expect(computed.get().text).toBe("Hello DEMO");
+    expect(computed().get().text).toBe("Hello DEMO");
   });
 
   it("Doesn't recompute value with each 'get' if there's no active subscription", () => {
     const { computed, topic } = createTestContext();
     const version = topic.get!();
 
-    const result1 = computed.get();
-    const result2 = computed.get();
+    const result1 = computed().get();
+    const result2 = computed().get();
 
     expect(result1).toBe(result2);
     expect(topic.get()).toBe(version);
@@ -35,7 +35,7 @@ describe("createComputed", () => {
       onNestedDependencyUnsubscribed,
     } = createTestContext();
 
-    computed.get();
+    computed().get();
 
     const unsubscribe1 = topic.subscribe(() => null);
     const unsubscribe2 = topic.subscribe(() => null);
@@ -59,8 +59,8 @@ describe("createComputed", () => {
 
     const version = topic.get();
 
-    const result1 = computed.get();
-    const result2 = computed.get();
+    const result1 = computed().get();
+    const result2 = computed().get();
 
     expect(result1).toBe(result2);
     expect(version).toBe(topic.get());
@@ -100,7 +100,7 @@ function createTestContext() {
     return { text: `${hello.get()} ${world.get()}` };
   });
 
-  const { dependencies: topics } = compute(() => computed.get());
+  const { dependencies: topics } = compute(() => computed().get());
 
   expect(topics.size).toEqual(1);
   const topic = topics.values().next().value;

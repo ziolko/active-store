@@ -1,4 +1,4 @@
-import { createExternalState, compute } from "./core";
+import { createExternalState, compute, Dependency } from "./core";
 import { createCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
@@ -6,18 +6,9 @@ export function createComputed<S extends (...args: any) => any>(selector: S) {
   type P = Parameters<S>;
   type R = ReturnType<S>;
 
-  const collection = createCollection((...params: P) =>
+  return createCollection((...params: P) =>
     createComputedSingle<R>(() => selector(...(params as any)))
   );
-
-  return {
-    get(...params: P): R {
-      return collection.get(...params).get();
-    },
-    getSubscribe(...params: P) {
-      return collection.get(...params).subscribe;
-    },
-  };
 }
 
 function createComputedSingle<R>(selector: () => R) {

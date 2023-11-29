@@ -1,6 +1,6 @@
 {
   "name": "active-store",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "description": "",
   "scripts": {
     "test": "jest",
@@ -29,6 +29,7 @@
     "vite-plugin-dts": "^3.5.3"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@types/shallowequal": "^1.1.1",

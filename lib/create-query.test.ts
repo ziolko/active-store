@@ -6,31 +6,31 @@ describe("createQuery", () => {
 
   it("Returns idle result by default", () => {
     const query = createQuery(async (id: number) => ({ id }));
-    expect(query.get(1).isIdle).toBe(true);
+    expect(query(1).get().isIdle).toBe(true);
   });
 
   it("Returns isLoading after starting fetch", () => {
     const query = createQuery((id: number) => success(id));
-    expect(query.get(1).isIdle).toBe(true);
-    query.fetch(1);
-    expect(query.get(1).isLoading).toBe(true);
+    expect(query(1).get().isIdle).toBe(true);
+    query(1).fetch();
+    expect(query(1).get().isLoading).toBe(true);
     jest.advanceTimersByTime(2000);
   });
 
   it("Returns isSuccess after fetch is done", async () => {
     const query = createQuery((id: number) => success(id));
-    query.fetch(1);
+    query(1).fetch();
     jest.advanceTimersByTime(2000);
     await Promise.resolve();
-    expect(query.get(1).isSuccess).toBe(true);
+    expect(query(1).get().isSuccess).toBe(true);
   });
 
   it("Returns isError after fetch fails", async () => {
     const query = createQuery((id: number) => failure(id));
-    query.fetch(1);
+    query(1).fetch();
     jest.advanceTimersByTime(2000);
     await Promise.resolve();
-    expect(query.get(1).isError).toBe(true);
+    expect(query(1).get().isError).toBe(true);
   });
 
   const success = <T>(data: T) =>

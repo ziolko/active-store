@@ -19,6 +19,9 @@ dependencies:
     version: 3.6.0(@types/node@20.7.0)(typescript@5.2.2)(vite@4.4.9)
 
 devDependencies:
+  '@jest/globals':
+    specifier: ^29.7.0
+    version: 29.7.0
   '@types/react':
     specifier: ^18.2.21
     version: 18.2.23

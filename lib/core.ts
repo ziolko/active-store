@@ -51,6 +51,10 @@ export interface Dependency {
   subscribe: (listener: (dependency: Dependency) => any) => () => void;
 }
 
+export interface ActiveState<T> {
+  get: () => T;
+}
+
 let currentDependencies: Set<Dependency> | null = null;
 
 export interface ComputeOptions {

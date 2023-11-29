@@ -52,27 +52,26 @@ export function createCollection<S extends (...params: any) => any>(
     return entry;
   }
 
-  return {
-    get(...params: P): R {
-      const key = hashQueryKey(params);
-      let result = cache.get(key)!;
-      if (!cache.has(key)) {
-        result = createCacheEntry(key, params);
-        cache.set(key, result);
-      }
+  function getItem(...params: P): R {
+    const key = hashQueryKey(params);
+    let result = cache.get(key)!;
+    if (!cache.has(key)) {
+      result = createCacheEntry(key, params);
+      cache.set(key, result);
+    }
+    result.topic?.get();
+    return result.data;
+  }
 
-      result.topic?.get();
-
-      return result.data;
-    },
-    getAll() {
-      const result = new Set<R>();
-      for (const entry of cache.values()) {
-        result.add(entry.data);
-      }
-      return result;
-    },
+  getItem.getAll = () => {
+    const result = new Set<R>();
+    for (const entry of cache.values()) {
+      result.add(entry.data);
+    }
+    return result;
   };
+
+  return getItem;
 }
 
 type QueryKey = readonly unknown[];
