@@ -6,9 +6,18 @@ export function createComputed<S extends (...args: any) => any>(selector: S) {
   type P = Parameters<S>;
   type R = ReturnType<S>;
 
-  return createCollection((...params: P) =>
+  const collection = createCollection((...params: P) =>
     createComputedSingle<R>(() => selector(...(params as any)))
   );
+
+  return {
+    get(...params: P): R {
+      return collection.get(...params).get();
+    },
+    item(...params: P) {
+      return collection.get(...params);
+    },
+  };
 }
 
 function createComputedSingle<R>(selector: () => R) {

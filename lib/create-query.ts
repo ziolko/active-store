@@ -1,6 +1,5 @@
-import { createExternalState, compute } from "./core";
+import { createExternalState } from "./core";
 import { createCollection } from "./create-collection";
-import { createState } from "./create-state";
 
 enum Status {
   IDLE = "idle",
@@ -30,11 +29,26 @@ export function createQuery<S extends (...args: any) => Promise<any>>(
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
-  return createCollection(
+  const collection = createCollection(
     (...params: P) =>
       createQuerySingle<R>(() => factory(...(params as any)), options),
     { inertia: options.ttl }
   );
+
+  return {
+    get(...params: Parameters<typeof factory>) {
+      return collection.get(...(params as any)).get();
+    },
+    fetch(...params: Parameters<typeof factory>) {
+      return collection.get(...(params as any)).fetch();
+    },
+    item(...params: Parameters<typeof factory>) {
+      return collection.get(...(params as any));
+    },
+    getAll() {
+      return collection.getAll();
+    },
+  };
 }
 
 function createQuerySingle<R>(
