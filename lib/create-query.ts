@@ -110,6 +110,7 @@ function createQuerySingle<R>(
 
   return {
     get: state.get,
+    subscribe: state.subscribe,
     fetch,
   };
 }
