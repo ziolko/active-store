@@ -1,3 +1,5 @@
+// @ts-ignore
+import { __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as reactInternals } from "react";
 export function createExternalState<R = any>(
   get: () => R,
   onSubscribe: (notify: () => void) => () => void
@@ -15,6 +17,12 @@ export function createExternalState<R = any>(
 
   const result = {
     get() {
+      if (reactInternals?.ReactCurrentOwner?.current && !currentDependencies) {
+        throw new Error(
+          "Accessing state value directly during React rendering is not allowed. Use useSelector instead."
+        );
+      }
+
       currentDependencies?.add(result as any);
       return get();
     },

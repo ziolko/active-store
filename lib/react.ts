@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useMemo } from "react";
+import { useSyncExternalStore, useState } from "react";
 import shallowequal from "shallowequal";
 
 import { compute } from "./core";
@@ -7,7 +7,7 @@ import { createDependenciesTracker } from "./create-dependencies-tracker";
 export function useSelector<
   R extends NoFunctionsAllowed<R extends (...props: any) => any ? never : R>
 >(selector: () => R): R {
-  const state = useMemo(createUseSelectorState, []);
+  const [state] = useState(createUseSelectorState);
 
   return useSyncExternalStore(state.subscribe, () =>
     state.getSnapshot(selector)
