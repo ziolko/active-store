@@ -16,5 +16,6 @@ export function createState<V>(initialValue: V) {
         topic.notify();
       }
     },
+    subscribe: topic.subscribe,
   };
 }
