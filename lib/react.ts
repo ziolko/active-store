@@ -42,6 +42,7 @@ function createUseSelectorState() {
       let wasRunningReactSelector = isRunningReactSelector.value;
       let value, topics;
       try {
+        isRunningReactSelector.value = true;
         const result = compute(selector);
         value = result.value;
         topics = result.dependencies;
