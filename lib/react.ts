@@ -1,7 +1,7 @@
 import { useSyncExternalStore, useState } from "react";
 import shallowequal from "shallowequal";
 
-import { compute } from "./core";
+import { compute, isRunningReactSelector } from "./core";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
 export function useSelector<
@@ -39,7 +39,16 @@ function createUseSelectorState() {
       };
     },
     getSnapshot(selector: () => any) {
-      const { value, dependencies: topics } = compute(selector);
+      let wasRunningReactSelector = isRunningReactSelector.value;
+      let value, topics;
+      try {
+        const result = compute(selector);
+        value = result.value;
+        topics = result.dependencies;
+      } finally {
+        isRunningReactSelector.value = wasRunningReactSelector;
+      }
+
       dependencies.update(topics);
 
       if (onUpdated) {

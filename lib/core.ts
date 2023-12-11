@@ -17,7 +17,10 @@ export function createExternalState<R = any>(
 
   const result = {
     get() {
-      if (reactInternals?.ReactCurrentOwner?.current && !currentDependencies) {
+      if (
+        reactInternals?.ReactCurrentOwner?.current &&
+        !isRunningReactSelector.value
+      ) {
         throw new Error(
           "Accessing state value directly during React rendering is not allowed. Use useSelector instead."
         );
@@ -83,3 +86,5 @@ export function compute<R>(
     currentDependencies = previousDependencies;
   }
 }
+
+export let isRunningReactSelector = { value: false };
