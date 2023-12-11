@@ -40,27 +40,27 @@ function createUseSelectorState() {
     },
     getSnapshot(selector: () => any) {
       let wasRunningReactSelector = isRunningReactSelector.value;
-      let value, topics;
       try {
         isRunningReactSelector.value = true;
-        const result = compute(selector);
-        value = result.value;
-        topics = result.dependencies;
+        const { value, dependencies: topics } = compute(selector);
+
+        dependencies.update(topics);
+
+        if (onUpdated) {
+          dependencies.subscribe();
+        }
+
+        if (
+          !Object.is(cachedValue, value) &&
+          !shallowequal(cachedValue, value)
+        ) {
+          cachedValue = value;
+        }
+
+        return cachedValue;
       } finally {
         isRunningReactSelector.value = wasRunningReactSelector;
       }
-
-      dependencies.update(topics);
-
-      if (onUpdated) {
-        dependencies.subscribe();
-      }
-
-      if (!Object.is(cachedValue, value) && !shallowequal(cachedValue, value)) {
-        cachedValue = value;
-      }
-
-      return cachedValue;
     },
   };
 }
