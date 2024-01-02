@@ -11,8 +11,8 @@ enum Status {
 type State<T> = {
   hasData: boolean;
   hasError: boolean;
-  isLoading: boolean;
-  isUpdating: boolean;
+  isLoadingInitial: boolean;
+  isLoadingUpdate: boolean;
   data?: T;
   error?: any;
 };
@@ -56,8 +56,8 @@ function createQuerySingle<R>(
 ) {
   let currentPromise: any = null;
   let currentState: State<R> = {
-    isLoading: false,
-    isUpdating: false,
+    isLoadingInitial: false,
+    isLoadingUpdate: false,
     hasData: false,
     hasError: false,
   };
@@ -95,8 +95,8 @@ function createQuerySingle<R>(
 
     currentState = {
       ...currentState,
-      isLoading: isInitialLoading,
-      isUpdating: !isInitialLoading,
+      isLoadingInitial: isInitialLoading,
+      isLoadingUpdate: !isInitialLoading,
     };
 
     state.notify();
@@ -105,8 +105,8 @@ function createQuerySingle<R>(
       (data: any) => {
         if (value === currentPromise) {
           currentState = {
-            isLoading: false,
-            isUpdating: false,
+            isLoadingInitial: false,
+            isLoadingUpdate: false,
             hasData: true,
             hasError: false,
             data,
@@ -117,8 +117,8 @@ function createQuerySingle<R>(
       (error: any) => {
         if (value === currentPromise) {
           currentState = currentState = {
-            isLoading: false,
-            isUpdating: false,
+            isLoadingInitial: false,
+            isLoadingUpdate: false,
             hasData: false,
             hasError: true,
             error,
