@@ -2,18 +2,17 @@ import { createExternalState } from "./core";
 import { createCollection } from "./create-collection";
 
 enum Status {
-  IDLE = "idle",
+  INITIAL = "initial",
   LOADING = "loading",
   ERROR = "error",
   SUCCESS = "success",
 }
 
 type State<T> = {
-  isSuccess: boolean;
-  isIdle: boolean;
-  isError: boolean;
+  hasData: boolean;
+  hasError: boolean;
   isLoading: boolean;
-  status: "idle" | "loading" | "error" | "success";
+  isUpdating: boolean;
   data?: T;
   error?: any;
 };
@@ -56,7 +55,12 @@ function createQuerySingle<R>(
   options: QueryOptions
 ) {
   let currentPromise: any = null;
-  let currentState: State<R> = getStatuses<R>(Status.IDLE);
+  let currentState: State<R> = {
+    isLoading: false,
+    isUpdating: false,
+    hasData: false,
+    hasError: false,
+  };
   let timeoutHandle: number | null = null;
 
   const state = createExternalState(
@@ -86,21 +90,39 @@ function createQuerySingle<R>(
 
     const value = factory();
     currentPromise = value;
-    const current = currentState;
 
-    currentState = getStatuses(Status.LOADING, current.data, current.error);
+    const isInitialLoading = !currentState.hasData && !currentState.hasError;
+
+    currentState = {
+      ...currentState,
+      isLoading: isInitialLoading,
+      isUpdating: !isInitialLoading,
+    };
+
     state.notify();
 
     value.then(
       (data: any) => {
         if (value === currentPromise) {
-          currentState = getStatuses(Status.SUCCESS, data);
+          currentState = {
+            isLoading: false,
+            isUpdating: false,
+            hasData: true,
+            hasError: false,
+            data,
+          };
           state.notify();
         }
       },
       (error: any) => {
         if (value === currentPromise) {
-          currentState = getStatuses(Status.ERROR, undefined, error);
+          currentState = currentState = {
+            isLoading: false,
+            isUpdating: false,
+            hasData: false,
+            hasError: true,
+            error,
+          };
           state.notify();
         }
       }
@@ -115,27 +137,26 @@ function createQuerySingle<R>(
   };
 }
 
-function getStatuses<T>(status: Status, data?: T, error?: any) {
-  const statuses = {
-    [Status.IDLE]: getStatus("idle", true, false, false, false),
-    [Status.LOADING]: getStatus("loading", false, true, false, false),
-    [Status.SUCCESS]: getStatus("success", false, false, true, false),
-    [Status.ERROR]: getStatus("error", false, false, false, true),
-  };
+// function getStatuses<T>(status: Status, data?: T, error?: any) {
+//   const statuses = {
+//     [Status.INITIAL]: getStatus(false, false, false, false),
+//     [Status.LOADING]: getStatus(false, false, true, false),
+//     [Status.SUCCESS]: getStatus("success", false, false, true, false),
+//     [Status.ERROR]: getStatus("error", false, false, false, true),
+//   };
 
-  return {
-    ...statuses[status],
-    data,
-    error,
-  };
-}
+//   return {
+//     ...statuses[status],
+//     data,
+//     error,
+//   };
+// }
 
 function getStatus(
-  status: any,
-  isIdle: boolean,
+  hasData: boolean,
+  hasError: boolean,
   isLoading: boolean,
-  isSuccess: boolean,
-  isError: boolean
+  isRefreshing: boolean
 ) {
-  return { status, isIdle, isLoading, isSuccess, isError };
+  return { hasData, hasError, isLoading, isRefreshing };
 }
