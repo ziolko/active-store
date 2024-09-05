@@ -102,7 +102,6 @@ function createQuerySingle<R>(
 
     let value: Promise<R>;
     try {
-      debugger;
       value = factory();
     } catch (error) {
       value = Promise.reject(error);
