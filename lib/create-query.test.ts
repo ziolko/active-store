@@ -8,7 +8,8 @@ describe("createQuery", () => {
     const query = activeQuery(async (id: number) => ({ id }));
     expect(query.state(1).hasData).toBe(false);
     expect(query.state(1).hasError).toBe(false);
-    expect(query.state(1).isLoadingInitial).toBe(false);
+    expect(query.state(1).status).toBe("pending");
+    expect(query.state(1).isLoadingInitial).toBe(true);
     expect(query.state(1).isLoadingUpdate).toBe(false);
   });
 
@@ -24,8 +25,7 @@ describe("createQuery", () => {
 
   it("Returns isLoading after starting fetch", () => {
     const query = activeQuery((id: number) => success(id));
-    expect(query.state(1).isLoadingInitial).toBe(false);
-    query.fetch(1);
+    expect(query.state(1).status).toBe("pending");
     expect(query.state(1).isLoadingInitial).toBe(true);
     expect(query.state(1).isLoadingUpdate).toBe(false);
     jest.advanceTimersByTime(2000);
@@ -33,10 +33,11 @@ describe("createQuery", () => {
 
   it("Returns isUpdating on subsequent fetch", async () => {
     const query = activeQuery((id: number) => success(id));
-    expect(query.state(1).isLoadingInitial).toBe(false);
+    expect(query.state(1).status).toBe("pending");
     query.fetch(1);
     jest.advanceTimersByTime(2000);
     await Promise.resolve();
+    expect(query.state(1).status).toBe("success");
 
     query.fetch(1);
     jest.advanceTimersByTime(10);
