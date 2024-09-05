@@ -41,14 +41,16 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
   const result = {
     get(...params: Parameters<S>) {
       const item = collection.get(...(params as any));
+      const promise = item.promise();
       const result = item.get();
 
       if (result.hasData) return result.data!;
       else if (result.hasError) throw result.error!;
-      else throw item.promise();
+      else throw promise;
     },
     state(...params: Parameters<S>) {
       const item = collection.get(...(params as any));
+      item.promise(); // start fetching data if it's not fetching yet
       return item.get() as any;
     },
     fetch(...params: Parameters<S>) {
@@ -154,28 +156,4 @@ function createQuerySingle<R>(
     promise: () => currentPromise ?? fetch(),
     fetch,
   };
-}
-
-// function getStatuses<T>(status: Status, data?: T, error?: any) {
-//   const statuses = {
-//     [Status.INITIAL]: getStatus(false, false, false, false),
-//     [Status.LOADING]: getStatus(false, false, true, false),
-//     [Status.SUCCESS]: getStatus("success", false, false, true, false),
-//     [Status.ERROR]: getStatus("error", false, false, false, true),
-//   };
-
-//   return {
-//     ...statuses[status],
-//     data,
-//     error,
-//   };
-// }
-
-function getStatus(
-  hasData: boolean,
-  hasError: boolean,
-  isLoading: boolean,
-  isRefreshing: boolean
-) {
-  return { hasData, hasError, isLoading, isRefreshing };
 }
