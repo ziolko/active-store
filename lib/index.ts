@@ -1,8 +1,8 @@
-export { createState } from "./create-state";
-export { createComputed } from "./create-computed";
-export { createCollection } from "./create-collection";
-export { createQuery } from "./create-query";
-export { createExternalState, compute } from "./core";
-export { useSelector } from "./react";
+export { activeState } from "./create-state";
+export { activeComputed } from "./create-computed";
+export { activeQuery } from "./create-query";
+export { activeExternalState, compute } from "./core";
+export { useActive } from "./react";
 
-export type { ActiveState } from "./core";
+export type { ActiveExternalState } from "./core";
+export type { ActiveState } from "./create-state";

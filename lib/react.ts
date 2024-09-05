@@ -4,17 +4,26 @@ import shallowequal from "shallowequal";
 import { compute, isRunningReactSelector } from "./core";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
-export function useSelector<
-  R extends NoFunctionsAllowed<R extends (...props: any) => any ? never : R>
->(selector: () => R): R {
-  const [state] = useState(createUseSelectorState);
+type ExcludeMethods<T> = {
+  [P in keyof T]: T[P] extends Function ? never : ExcludeMethods<T[P]>;
+};
 
-  return useSyncExternalStore(state.subscribe, () =>
+export function useActive<
+  S extends () => ReturnType<S> extends Function ? never : ReturnType<S>
+>(selector: S): ExcludeMethods<ReturnType<S>> {
+  const [state] = useState(createActiveSelectorState);
+  const result = useSyncExternalStore(state.subscribe, () =>
     state.getSnapshot(selector)
   );
+
+  if (typeof (result as any)?.then === "function") {
+    throw result;
+  }
+
+  return result;
 }
 
-function createUseSelectorState() {
+function createActiveSelectorState() {
   let onUpdated: any;
   let dependencies = createDependenciesTracker(() => onUpdated?.());
   let cachedValue: any = undefined;
@@ -42,12 +51,20 @@ function createUseSelectorState() {
       let wasRunningReactSelector = isRunningReactSelector.value;
       try {
         isRunningReactSelector.value = true;
-        const { value, dependencies: topics } = compute(selector);
+        const { value, error, dependencies: topics } = compute(selector);
 
         dependencies.update(topics);
 
         if (onUpdated) {
           dependencies.subscribe();
+        }
+
+        if (typeof (error as any)?.then === "function") {
+          return error;
+        }
+
+        if (error) {
+          throw error;
         }
 
         if (
@@ -64,7 +81,3 @@ function createUseSelectorState() {
     },
   };
 }
-
-type NoFunctionsAllowed<T> = {
-  [P in keyof T]: T[P] extends (...args: any) => any ? never : T[P];
-};

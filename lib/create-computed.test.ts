@@ -1,7 +1,7 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { createState } from "./create-state";
-import { createComputed } from "./create-computed";
-import { createExternalState, compute } from "./core";
+import { activeState } from "./create-state";
+import { activeComputed } from "./create-computed";
+import { activeExternalState, compute } from "./core";
 
 describe("createComputed", () => {
   it("Returns computed value", () => {
@@ -28,7 +28,7 @@ describe("createComputed", () => {
   });
 
   it("Returns different results for different keys", () => {
-    const computed = createComputed((value: number) => ({ value }));
+    const computed = activeComputed((value: number) => ({ value }));
 
     expect(computed.get(1)).toEqual({ value: 1 });
     expect(computed.get(2)).toEqual({ value: 2 });
@@ -92,17 +92,17 @@ describe("createComputed", () => {
 });
 
 function createTestContext() {
-  const hello = createState("Hello");
-  const world = createState("World");
+  const hello = activeState("Hello");
+  const world = activeState("World");
   const onNestedDependencyUnsubscribed = jest.fn(() => null);
   const onNestedDependencySubscribed = jest.fn(
     () => onNestedDependencyUnsubscribed
   );
-  const nestedDependency = createExternalState(
+  const nestedDependency = activeExternalState(
     () => 0,
     onNestedDependencySubscribed
   );
-  const computed = createComputed(() => {
+  const computed = activeComputed(() => {
     nestedDependency.get();
     return { text: `${hello.get()} ${world.get()}` };
   });

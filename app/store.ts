@@ -1,10 +1,10 @@
-import { createState, createComputed, createQuery } from "../lib";
+import { activeState, activeComputed, activeQuery } from "../lib";
 
 type ToDoItem = { id: number; name: string; isDone: boolean };
 
 function createTodoApp() {
-  const newItem = createState("");
-  const items = createState<ToDoItem[]>([]);
+  const newItem = activeState("");
+  const items = activeState<ToDoItem[]>([]);
 
   const addItem = () => {
     items.set([
@@ -28,45 +28,29 @@ function createTodoApp() {
     );
   };
 
-  const count = createComputed((value: number) => items.get().length + value);
+  const count = activeComputed((value: number) => items.get().length + value);
 
-  const breedList = createQuery(() =>
-    fetch("https://dog.ceo/api/breeds/list/all")
-      .then((x) => x.json())
-      .then((data) => Object.keys(data.message).filter((_, i) => i > -1))
-  );
+  const breedList = activeQuery(async () => {
+    await new Promise((x) => setTimeout(x, 500));
+    const x_1 = await fetch("https://dog.ceo/api/breeds/list/all");
+    const data = await x_1.json();
+    return Object.keys(data.message).filter((_, i) => i > -1) as string[];
+  });
 
-  const breedImage = createQuery((breed: string, page: number) =>
-    new Promise((x) => setTimeout(x, 500))
-      .then(() => fetch(`https://dog.ceo/api/breed/${breed}/images/random`))
-      .then((x) => x.json())
-      .then((data) => ({ img: data.message as string, page }))
-  );
-
-  const updateSingleBreed = (breed: string, page: number) =>
-    breedImage.fetch(breed, page);
-
-  const updateAllBreeds = () =>
-    breedImage.getAll().forEach((item) => item.fetch());
-
-  async function asyncAction(name: string, age: number) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    return `${name} -- ${age}`;
-  }
+  const breedUpperCase = activeComputed(() => {
+    const breeds = breedList.get();
+    return breeds.map((item) => item.toUpperCase());
+  });
 
   return {
-    getNewItem: newItem.get,
-    setNewItem: newItem.set,
-    getItems: items.get,
-    getCount: count.get,
+    newItem,
+    items,
+    count,
+    breedList,
+    breedUpperCase,
     addItem,
     removeItem,
     toggleItem,
-    getBreedList: breedList.get,
-    getBreedImage: breedImage.get,
-    updateSingleBreed,
-    updateAllBreeds,
-    asyncAction,
   };
 }
 

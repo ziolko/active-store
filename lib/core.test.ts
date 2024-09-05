@@ -1,11 +1,11 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { createExternalState as createExternalState, compute } from "./core";
+import { activeExternalState, compute } from "./core";
 
 describe("createTopic", () => {
   it("Calls subscribed function", () => {
     const listener = jest.fn();
     let notifyTopic: () => void;
-    const state = createExternalState(
+    const state = activeExternalState(
       () => 1,
       (notify) => (notifyTopic = notify)
     );
@@ -17,7 +17,7 @@ describe("createTopic", () => {
   it("Doesn't call subscribed function if unsubscribed", () => {
     const listener = jest.fn();
     let notifyTopic: () => void;
-    const state = createExternalState(
+    const state = activeExternalState(
       () => 1,
       (notify) => (notifyTopic = notify)
     );
@@ -35,7 +35,7 @@ describe("execute", () => {
   });
 
   it("Returns registered dependency from selector", () => {
-    const state = createExternalState(
+    const state = activeExternalState(
       () => 1,
       () => () => null
     );
@@ -45,7 +45,7 @@ describe("execute", () => {
   });
 
   it("Registers the same dependency once even if registered multiple times", () => {
-    const state = createExternalState(
+    const state = activeExternalState(
       () => 1,
       () => () => null
     );
@@ -62,6 +62,6 @@ describe("execute", () => {
       throw new Error("test-error");
     }
 
-    expect(() => compute(selector)).toThrow();
+    expect(compute(selector).error).not.toBeFalsy();
   });
 });

@@ -1,6 +1,20 @@
 // @ts-ignore
 import { __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as reactInternals } from "react";
-export function createExternalState<R = any>(
+
+export interface ActiveExternalState<R> {
+  get: () => R;
+  state: () => State<R>;
+  notify: () => void;
+  subscribe: (listener: (dependency: Dependency) => any) => () => void;
+}
+
+export interface State<R> {
+  status: "pending" | "success" | "error";
+  data?: R;
+  error?: any;
+}
+
+export function activeExternalState<R = any>(
   get: () => R,
   onSubscribe: (notify: () => void) => () => void
 ) {
@@ -15,7 +29,7 @@ export function createExternalState<R = any>(
     }
   }
 
-  const result = {
+  const result: ActiveExternalState<R> = {
     get() {
       if (
         reactInternals?.ReactCurrentOwner?.current &&
@@ -28,6 +42,17 @@ export function createExternalState<R = any>(
 
       currentDependencies?.add(result as any);
       return get();
+    },
+    state() {
+      try {
+        return { status: "success", data: result.get() };
+      } catch (error: any) {
+        if (error instanceof Promise || typeof error?.then === "function") {
+          return { status: "pending" };
+        } else {
+          return { error, status: "error" };
+        }
+      }
     },
     notify,
     subscribe(listener: (dependency: Dependency) => void) {
@@ -62,10 +87,6 @@ export interface Dependency {
   subscribe: (listener: (dependency: Dependency) => any) => () => void;
 }
 
-export interface ActiveState<T> {
-  get: () => T;
-}
-
 let currentDependencies: Set<Dependency> | null = null;
 
 export interface ComputeOptions {
@@ -78,10 +99,12 @@ export function compute<R>(
 ) {
   const previousDependencies = currentDependencies;
 
+  const dependencies = trackDependencies ? new Set<Dependency>() : null;
   try {
-    const dependencies = trackDependencies ? new Set<Dependency>() : null;
     currentDependencies = dependencies;
     return { value: selector() as R, dependencies: dependencies ?? new Set() };
+  } catch (error) {
+    return { error, dependencies: dependencies ?? new Set() };
   } finally {
     currentDependencies = previousDependencies;
   }

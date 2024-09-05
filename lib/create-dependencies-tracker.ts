@@ -22,8 +22,14 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
           }
 
           for (const topic of dependencies) {
-            if (cache.get(topic)?.value !== topic.get?.()) {
-              return true;
+            try {
+              if (topic.get?.() !== cache.get(topic)?.value) {
+                return true;
+              }
+            } catch (error) {
+              if (error !== cache.get(topic)?.value) {
+                return true;
+              }
             }
           }
 
@@ -33,7 +39,7 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
       ).value;
     },
     update(dependencies: Set<Dependency>) {
-      return compute(() => {
+      compute(() => {
         // Search for existing and new topics
         for (const topic of dependencies) {
           let cached = cache.get(topic);
@@ -42,7 +48,11 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
             cache.set(topic, cached);
           }
 
-          cached.value = topic.get?.();
+          try {
+            cached.value = topic.get?.();
+          } catch (error) {
+            cached.value = error;
+          }
         }
 
         // Search for topics that are no longer there
@@ -54,7 +64,7 @@ export function createDependenciesTracker(onDependencyChanged: () => void) {
         }
 
         isInitialized = true;
-      }).value;
+      });
     },
     subscribe() {
       for (const [key, value] of cache) {

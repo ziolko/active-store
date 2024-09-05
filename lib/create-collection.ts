@@ -1,10 +1,10 @@
-import { Dependency, createExternalState, compute } from "./core";
+import { Dependency, activeExternalState } from "./core";
 
 export interface CollectionOptions {
   inertia?: number;
 }
 
-export function createCollection<S extends (...params: any) => any>(
+export function activeCollection<S extends (...params: any) => any>(
   selector: S,
   options: CollectionOptions = {}
 ) {
@@ -22,7 +22,7 @@ export function createCollection<S extends (...params: any) => any>(
     }
 
     let version = 0;
-    entry.topic = createExternalState(
+    entry.topic = activeExternalState(
       () => version,
       () => {
         stopTimer();

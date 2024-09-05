@@ -1,12 +1,5 @@
-import { createExternalState } from "./core";
-import { createCollection } from "./create-collection";
-
-enum Status {
-  INITIAL = "initial",
-  LOADING = "loading",
-  ERROR = "error",
-  SUCCESS = "success",
-}
+import { activeExternalState } from "./core";
+import { activeCollection } from "./create-collection";
 
 type State<T> = {
   hasData: boolean;
@@ -15,39 +8,55 @@ type State<T> = {
   isLoadingUpdate: boolean;
   data?: T;
   error?: any;
+  status: "pending" | "success" | "error";
 };
 
 export interface QueryOptions {
   ttl?: number;
 }
 
-export function createQuery<S extends (...args: any) => Promise<any>>(
+export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
+  get: (
+    ...params: Parameters<S>
+  ) => ReturnType<S> extends Promise<infer A> ? A : never;
+  state: (
+    ...params: Parameters<S>
+  ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
+  fetch: (...params: Parameters<S>) => ReturnType<S>;
+}
+
+export function activeQuery<S extends (...args: any) => Promise<any>>(
   factory: S,
   options: QueryOptions = {}
-) {
+): ActiveQuery<S> {
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
-  const collection = createCollection(
+  const collection = activeCollection(
     (...params: P) =>
       createQuerySingle<R>(() => factory(...(params as any)), options),
     { inertia: options.ttl }
   );
 
-  return {
-    get(...params: Parameters<typeof factory>) {
-      return collection.get(...(params as any)).get();
+  const result = {
+    get(...params: Parameters<S>) {
+      const item = collection.get(...(params as any));
+      const result = item.get();
+
+      if (result.hasData) return result.data!;
+      else if (result.hasError) throw result.error!;
+      else throw item.promise();
     },
-    fetch(...params: Parameters<typeof factory>) {
-      return collection.get(...(params as any)).fetch();
+    state(...params: Parameters<S>) {
+      const item = collection.get(...(params as any));
+      return item.get() as any;
     },
-    item(...params: Parameters<typeof factory>) {
-      return collection.get(...(params as any));
-    },
-    getAll() {
-      return collection.getAll();
+    fetch(...params: Parameters<S>) {
+      return collection.get(...(params as any)).fetch() as any;
     },
   };
+
+  return result;
 }
 
 function createQuerySingle<R>(
@@ -56,6 +65,7 @@ function createQuerySingle<R>(
 ) {
   let currentPromise: any = null;
   let currentState: State<R> = {
+    status: "pending",
     isLoadingInitial: false,
     isLoadingUpdate: false,
     hasData: false,
@@ -63,12 +73,12 @@ function createQuerySingle<R>(
   };
   let timeoutHandle: number | null = null;
 
-  const state = createExternalState(
+  const state = activeExternalState(
     function get() {
       return currentState;
     },
     function onSubscribe() {
-      setTimeout(() => fetch(), 0);
+      setTimeout(() => currentPromise ?? fetch(), 0);
       if (options.ttl) {
         timeoutHandle = setTimeout(() => fetch(), options.ttl) as any;
       }
@@ -88,7 +98,13 @@ function createQuerySingle<R>(
       timeoutHandle = setTimeout(() => fetch(), options.ttl) as any;
     }
 
-    const value = factory();
+    let value: Promise<R>;
+    try {
+      debugger;
+      value = factory();
+    } catch (error) {
+      value = Promise.reject(error);
+    }
     currentPromise = value;
 
     const isInitialLoading = !currentState.hasData && !currentState.hasError;
@@ -105,6 +121,7 @@ function createQuerySingle<R>(
       (data: any) => {
         if (value === currentPromise) {
           currentState = {
+            status: "success",
             isLoadingInitial: false,
             isLoadingUpdate: false,
             hasData: true,
@@ -117,6 +134,7 @@ function createQuerySingle<R>(
       (error: any) => {
         if (value === currentPromise) {
           currentState = currentState = {
+            status: error,
             isLoadingInitial: false,
             isLoadingUpdate: false,
             hasData: false,
@@ -133,6 +151,7 @@ function createQuerySingle<R>(
   return {
     get: state.get,
     subscribe: state.subscribe,
+    promise: () => currentPromise ?? fetch(),
     fetch,
   };
 }

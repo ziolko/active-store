@@ -1,27 +1,27 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { createState } from "./create-state";
+import { activeState } from "./create-state";
 import { Dependency, compute } from "./core";
 
 describe("createState", () => {
   it("Returns initial value", () => {
-    const state = createState("test-value");
+    const state = activeState("test-value");
     expect(state.get()).toEqual("test-value");
   });
 
   it("Updates stored value", () => {
-    const state = createState("test-value");
+    const state = activeState("test-value");
     state.set("another-value");
     expect(state.get()).toEqual("another-value");
   });
 
   it("Registers topics when run", () => {
-    const state = createState("test-value");
+    const state = activeState("test-value");
     const { dependencies } = compute(() => state.get());
     expect(dependencies.size).toEqual(1);
   });
 
   it("Notifies registered subscriber and update version when value changed", () => {
-    const state = createState("test-value");
+    const state = activeState("test-value");
     const { dependencies: topics } = compute(() => state.get());
     const topic: Dependency = topics.values().next().value;
 
@@ -34,7 +34,7 @@ describe("createState", () => {
   });
 
   it("Doesn't notify subscribers if new and old values are equal", () => {
-    const state = createState("test-value");
+    const state = activeState("test-value");
     const { dependencies: topics } = compute(() => state.get());
     const topic: Dependency = topics.values().next().value;
 

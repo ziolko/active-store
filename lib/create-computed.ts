@@ -1,28 +1,44 @@
-import { createExternalState, compute, Dependency } from "./core";
-import { createCollection } from "./create-collection";
+import { activeExternalState, compute, State } from "./core";
+import { activeCollection } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
-export function createComputed<S extends (...args: any) => any>(selector: S) {
+export interface ActiveComputed<S extends (...args: any) => any> {
+  get: (...params: Parameters<S>) => ReturnType<S>;
+  state: (...params: Parameters<S>) => State<ReturnType<S>>;
+}
+
+export function activeComputed<S extends (...args: any) => any>(selector: S) {
   type P = Parameters<S>;
   type R = ReturnType<S>;
 
-  const collection = createCollection((...params: P) =>
+  const collection = activeCollection((...params: P) =>
     createComputedSingle<R>(() => selector(...(params as any)))
   );
 
-  return {
+  const result: ActiveComputed<S> = {
     get(...params: P): R {
       return collection.get(...params).get();
     },
-    item(...params: P) {
-      return collection.get(...params);
+    state(...params: P): State<R> {
+      try {
+        return { status: "success", data: collection.get(...params).get() };
+      } catch (error: any) {
+        if (error instanceof Promise || typeof error?.then === "function") {
+          return { status: "pending" };
+        } else {
+          return { error, status: "error" };
+        }
+      }
     },
   };
+
+  return result;
 }
 
 function createComputedSingle<R>(selector: () => R) {
   const state = {
-    value: undefined as R,
+    value: undefined as R | undefined,
+    error: undefined as any,
     isSubscribed: false,
     hasAnyDependencyChanged: false,
     notifyAboutChanges: null as null | (() => void),
@@ -33,24 +49,37 @@ function createComputedSingle<R>(selector: () => R) {
     state.notifyAboutChanges?.();
   });
 
-  const topic = createExternalState(
+  const topic = activeExternalState(
     function get() {
       if (state.isSubscribed && !state.hasAnyDependencyChanged) {
+        if (state.error) {
+          throw state.error;
+        }
+
         return state.value;
       }
 
       if (!state.isSubscribed && !dependencies.hasChanged()) {
+        if (state.error) {
+          throw state.error;
+        }
+
         return state.value;
       }
 
-      const { value, dependencies: topics } = compute(selector);
+      const { value, error, dependencies: topics } = compute(selector);
 
       dependencies.update(topics);
       state.hasAnyDependencyChanged = false;
       state.value = value;
+      state.error = error;
 
       if (state.isSubscribed) {
         dependencies.subscribe();
+      }
+
+      if (state.error) {
+        throw state.error;
       }
 
       return value;
@@ -60,9 +89,10 @@ function createComputedSingle<R>(selector: () => R) {
       state.notifyAboutChanges = notifyAboutChanges;
 
       if (dependencies.hasChanged()) {
-        const { value, dependencies: topics } = compute(selector);
+        const { value, error, dependencies: topics } = compute(selector);
         dependencies.update(topics);
         state.value = value;
+        state.error = error;
         notifyAboutChanges();
       }
 
