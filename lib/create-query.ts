@@ -23,6 +23,9 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
   fetch: (...params: Parameters<S>) => ReturnType<S>;
+  invalidate: (
+    predicate: (...params: Parameters<S>) => boolean
+  ) => Promise<void>;
 }
 
 export function activeQuery<S extends (...args: any) => Promise<any>>(

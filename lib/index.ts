@@ -6,3 +6,5 @@ export { useActive } from "./react";
 
 export type { ActiveExternalState } from "./core";
 export type { ActiveState } from "./create-state";
+export type { ActiveComputed } from "./create-computed";
+export type { ActiveQuery } from "./create-query";
