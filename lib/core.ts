@@ -36,7 +36,7 @@ export function activeExternalState<R = any>(
         !isRunningReactSelector.value
       ) {
         throw new Error(
-          "Accessing state value directly during React rendering is not allowed. Use useSelector instead."
+          "Accessing state value directly during React rendering is not allowed. Use useActive instead."
         );
       }
 

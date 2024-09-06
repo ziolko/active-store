@@ -41,7 +41,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
   const result = {
     get(...params: Parameters<S>) {
       const item = collection.get(...(params as any));
-      const promise = item.promise();
+      const promise = item.promise(); // start fetching data if it's not fetching yet
       const result = item.get();
 
       if (result.hasData) return result.data!;
@@ -56,6 +56,13 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     fetch(...params: Parameters<S>) {
       return collection.get(...(params as any)).fetch() as any;
     },
+    async invalidate(predicate: (...params: Parameters<S>) => boolean) {
+      const promises: Promise<void>[] = [];
+      for (const item of collection.filter(predicate)) {
+        promises.push(item.invalidate());
+      }
+      await Promise.all(promises);
+    },
   };
 
   return result;
@@ -65,14 +72,17 @@ function createQuerySingle<R>(
   factory: () => Promise<R>,
   options: QueryOptions
 ) {
-  let currentPromise: any = null;
-  let currentState: State<R> = {
+  const initialState: State<R> = {
     status: "pending",
     isLoadingInitial: false,
     isLoadingUpdate: false,
     hasData: false,
     hasError: false,
   };
+
+  let isSubscribed = false;
+  let currentPromise: any = null;
+  let currentState = initialState;
   let timeoutHandle: number | null = null;
 
   const state = activeExternalState(
@@ -84,11 +94,13 @@ function createQuerySingle<R>(
       if (options.ttl) {
         timeoutHandle = setTimeout(() => fetch(), options.ttl) as any;
       }
+      isSubscribed = true;
       return () => {
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
         timeoutHandle = null;
+        isSubscribed = false;
         return null;
       };
     }
@@ -134,7 +146,7 @@ function createQuerySingle<R>(
       },
       (error: any) => {
         if (value === currentPromise) {
-          currentState = currentState = {
+          currentState = {
             status: error,
             isLoadingInitial: false,
             isLoadingUpdate: false,
@@ -149,10 +161,19 @@ function createQuerySingle<R>(
     return value;
   }
 
+  async function invalidate() {
+    currentState = initialState;
+    currentPromise = null;
+    if (isSubscribed) {
+      await fetch();
+    }
+  }
+
   return {
     get: state.get,
     subscribe: state.subscribe,
     promise: () => currentPromise ?? fetch(),
     fetch,
+    invalidate,
   };
 }

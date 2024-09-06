@@ -64,10 +64,12 @@ export function activeCollection<S extends (...params: any) => any>(
       result.topic?.get();
       return result.data;
     },
-    getAll() {
-      const result = new Set<R>();
-      for (const entry of cache.values()) {
-        result.add(entry.data);
+    filter(predicate: (...params: P) => boolean): R[] {
+      const result = [];
+      for (const [key, value] of cache.entries()) {
+        if (predicate(...JSON.parse(key))) {
+          result.push(value.data);
+        }
       }
       return result;
     },
