@@ -1,12 +1,12 @@
 import { Dependency, activeExternalState } from "./core";
 
 export interface CollectionOptions {
-  inertia?: number;
+  gcTime: number;
 }
 
 export function activeCollection<S extends (...params: any) => any>(
   selector: S,
-  options: CollectionOptions = {}
+  { gcTime }: CollectionOptions
 ) {
   type R = ReturnType<S>;
   type P = Parameters<S>;
@@ -17,7 +17,7 @@ export function activeCollection<S extends (...params: any) => any>(
   function createCacheEntry(key: string, params: any) {
     const entry: CacheEntry = { data: selector(...params) };
 
-    if (options.inertia == null) {
+    if (gcTime === Number.POSITIVE_INFINITY) {
       return entry;
     }
 
@@ -33,12 +33,16 @@ export function activeCollection<S extends (...params: any) => any>(
     let timeoutHandler: number | undefined;
 
     function startTimer() {
-      clearTimeout(timeoutHandler);
-      timeoutHandler = setTimeout(onTimeout, options.inertia) as any;
+      if (timeoutHandler) {
+        clearTimeout(timeoutHandler);
+      }
+      timeoutHandler = setTimeout(onTimeout, gcTime) as any;
     }
 
     function stopTimer() {
-      clearTimeout(timeoutHandler);
+      if (timeoutHandler) {
+        clearTimeout(timeoutHandler);
+      }
       timeoutHandler = undefined;
     }
 

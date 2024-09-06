@@ -11,8 +11,10 @@ export function activeComputed<S extends (...args: any) => any>(selector: S) {
   type P = Parameters<S>;
   type R = ReturnType<S>;
 
-  const collection = activeCollection((...params: P) =>
-    createComputedSingle<R>(() => selector(...(params as any)))
+  const collection = activeCollection(
+    (...params: P) =>
+      createComputedSingle<R>(() => selector(...(params as any))),
+    { gcTime: Number.POSITIVE_INFINITY }
   );
 
   const result: ActiveComputed<S> = {

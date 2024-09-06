@@ -6,11 +6,11 @@ describe("createQuery", () => {
 
   it("Returns idle result by default", () => {
     const query = activeQuery(async (id: number) => ({ id }));
-    expect(query.state(1).hasData).toBe(false);
-    expect(query.state(1).hasError).toBe(false);
+    expect(query.state(1).isSuccess).toBe(false);
+    expect(query.state(1).isError).toBe(false);
     expect(query.state(1).status).toBe("pending");
-    expect(query.state(1).isLoadingInitial).toBe(true);
-    expect(query.state(1).isLoadingUpdate).toBe(false);
+    expect(query.state(1).isLoading).toBe(true);
+    expect(query.state(1).isRefetching).toBe(false);
   });
 
   it("Throws promise when query is idle", () => {
@@ -26,42 +26,42 @@ describe("createQuery", () => {
   it("Returns isLoading after starting fetch", () => {
     const query = activeQuery((id: number) => success(id));
     expect(query.state(1).status).toBe("pending");
-    expect(query.state(1).isLoadingInitial).toBe(true);
-    expect(query.state(1).isLoadingUpdate).toBe(false);
+    expect(query.state(1).isLoading).toBe(true);
+    expect(query.state(1).isRefetching).toBe(false);
     jest.advanceTimersByTime(2000);
   });
 
   it("Returns isUpdating on subsequent fetch", async () => {
     const query = activeQuery((id: number) => success(id));
     expect(query.state(1).status).toBe("pending");
-    query.fetch(1);
+    query.refetch(1);
     jest.advanceTimersByTime(2000);
     await Promise.resolve();
     expect(query.state(1).status).toBe("success");
 
-    query.fetch(1);
+    query.refetch(1);
     jest.advanceTimersByTime(10);
     await Promise.resolve();
 
-    expect(query.state(1).isLoadingInitial).toBe(false);
-    expect(query.state(1).isLoadingUpdate).toBe(true);
+    expect(query.state(1).isLoading).toBe(false);
+    expect(query.state(1).isRefetching).toBe(true);
   });
 
   it("Returns hasSuccess after fetch is done", async () => {
     const query = activeQuery((id: number) => success(id));
-    query.fetch(1);
+    query.refetch(1);
     jest.advanceTimersByTime(2000);
     await Promise.resolve();
-    expect(query.state(1).hasData).toBe(true);
+    expect(query.state(1).isSuccess).toBe(true);
     expect(query.get(1)).toBe(1);
   });
 
   it("Returns hasError after fetch fails", async () => {
     const query = activeQuery((id: number) => failure(id));
-    query.fetch(1);
+    query.refetch(1);
     jest.advanceTimersByTime(2000);
     await Promise.resolve();
-    expect(query.state(1).hasError).toBe(true);
+    expect(query.state(1).isError).toBe(true);
     expect(() => query.get(1)).toThrow();
   });
 

@@ -2,17 +2,20 @@ import { activeExternalState } from "./core";
 import { activeCollection } from "./create-collection";
 
 type State<T> = {
-  hasData: boolean;
-  hasError: boolean;
-  isLoadingInitial: boolean;
-  isLoadingUpdate: boolean;
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  isLoading: boolean;
+  isRefetching: boolean;
+  isFetching: boolean;
+  isStale: boolean;
   data?: T;
   error?: any;
   status: "pending" | "success" | "error";
 };
 
 export interface QueryOptions {
-  ttl?: number;
+  gcTime?: number;
 }
 
 export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
@@ -22,23 +25,24 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
-  fetch: (...params: Parameters<S>) => ReturnType<S>;
+  refetch: (...params: Parameters<S>) => ReturnType<S>;
   invalidate: (
-    predicate: (...params: Parameters<S>) => boolean
+    predicate: (...params: Parameters<S>) => boolean,
+    options?: { clear: boolean }
   ) => Promise<void>;
 }
 
 export function activeQuery<S extends (...args: any) => Promise<any>>(
   factory: S,
-  options: QueryOptions = {}
+  { gcTime = Number.POSITIVE_INFINITY }: QueryOptions = {}
 ): ActiveQuery<S> {
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
   const collection = activeCollection(
     (...params: P) =>
-      createQuerySingle<R>(() => factory(...(params as any)), options),
-    { inertia: options.ttl }
+      createQuerySingle<R>(() => factory(...(params as any)), { gcTime }),
+    { gcTime: gcTime }
   );
 
   const result = {
@@ -47,8 +51,8 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       const promise = item.promise(); // start fetching data if it's not fetching yet
       const result = item.get();
 
-      if (result.hasData) return result.data!;
-      else if (result.hasError) throw result.error!;
+      if (result.isSuccess) return result.data!;
+      else if (result.isError) throw result.error!;
       else throw promise;
     },
     state(...params: Parameters<S>) {
@@ -56,7 +60,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       item.promise(); // start fetching data if it's not fetching yet
       return item.get() as any;
     },
-    fetch(...params: Parameters<S>) {
+    refetch(...params: Parameters<S>) {
       return collection.get(...(params as any)).fetch() as any;
     },
     async invalidate(predicate: (...params: Parameters<S>) => boolean) {
@@ -73,14 +77,17 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
 
 function createQuerySingle<R>(
   factory: () => Promise<R>,
-  options: QueryOptions
+  options: { gcTime: number }
 ) {
   const initialState: State<R> = {
     status: "pending",
-    isLoadingInitial: false,
-    isLoadingUpdate: false,
-    hasData: false,
-    hasError: false,
+    isPending: true,
+    isSuccess: false,
+    isError: false,
+    isLoading: false,
+    isFetching: false,
+    isRefetching: false,
+    isStale: false,
   };
 
   let isSubscribed = false;
@@ -94,15 +101,10 @@ function createQuerySingle<R>(
     },
     function onSubscribe() {
       setTimeout(() => currentPromise ?? fetch(), 0);
-      if (options.ttl) {
-        timeoutHandle = setTimeout(() => fetch(), options.ttl) as any;
-      }
+      handleGcTimeout({ clear: true, setup: true });
       isSubscribed = true;
       return () => {
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-        timeoutHandle = null;
+        handleGcTimeout({ clear: true, setup: false });
         isSubscribed = false;
         return null;
       };
@@ -110,10 +112,7 @@ function createQuerySingle<R>(
   );
 
   function fetch() {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-      timeoutHandle = setTimeout(() => fetch(), options.ttl) as any;
-    }
+    handleGcTimeout({ clear: true, setup: true });
 
     let value: Promise<R>;
     try {
@@ -123,12 +122,14 @@ function createQuerySingle<R>(
     }
     currentPromise = value;
 
-    const isInitialLoading = !currentState.hasData && !currentState.hasError;
+    const isInitialLoading = !currentState.isSuccess && !currentState.isError;
 
     currentState = {
       ...currentState,
-      isLoadingInitial: isInitialLoading,
-      isLoadingUpdate: !isInitialLoading,
+      isPending: isInitialLoading,
+      isLoading: isInitialLoading,
+      isFetching: true,
+      isRefetching: !isInitialLoading,
     };
 
     state.notify();
@@ -138,10 +139,13 @@ function createQuerySingle<R>(
         if (value === currentPromise) {
           currentState = {
             status: "success",
-            isLoadingInitial: false,
-            isLoadingUpdate: false,
-            hasData: true,
-            hasError: false,
+            isPending: false,
+            isLoading: false,
+            isFetching: false,
+            isRefetching: false,
+            isSuccess: true,
+            isError: false,
+            isStale: false,
             data,
           };
           state.notify();
@@ -151,10 +155,13 @@ function createQuerySingle<R>(
         if (value === currentPromise) {
           currentState = {
             status: error,
-            isLoadingInitial: false,
-            isLoadingUpdate: false,
-            hasData: false,
-            hasError: true,
+            isPending: false,
+            isLoading: false,
+            isFetching: false,
+            isRefetching: false,
+            isSuccess: false,
+            isError: true,
+            isStale: false,
             error,
           };
           state.notify();
@@ -164,8 +171,19 @@ function createQuerySingle<R>(
     return value;
   }
 
+  function handleGcTimeout(opts: { clear: boolean; setup: boolean }) {
+    if (opts.clear && timeoutHandle) {
+      clearTimeout(timeoutHandle);
+      timeoutHandle = null;
+    }
+
+    if (opts.setup && options.gcTime !== Number.POSITIVE_INFINITY) {
+      timeoutHandle = setTimeout(() => fetch(), options.gcTime) as any;
+    }
+  }
+
   async function invalidate() {
-    currentState = initialState;
+    currentState = currentState = { ...currentState, isStale: true };
     currentPromise = null;
     if (isSubscribed) {
       await fetch();

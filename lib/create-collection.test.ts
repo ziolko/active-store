@@ -6,17 +6,23 @@ describe("createCollection", () => {
   jest.useFakeTimers();
 
   it("Returns the same cached object for the same params", () => {
-    const collection = activeCollection((id: number) => ({ id }));
+    const collection = activeCollection((id: number) => ({ id }), {
+      gcTime: 1000,
+    });
     expect(collection.get(1)).toBe(collection.get(1));
   });
 
   it("Returns different cached objects for different params", () => {
-    const collection = activeCollection((id: number) => ({ id }));
+    const collection = activeCollection((id: number) => ({ id }), {
+      gcTime: 1000,
+    });
     expect(collection.get(1)).not.toBe(collection.get(2));
   });
 
   it("Returns the sam cached object for the same complex key object", () => {
-    const collection = activeCollection((id: number, param: any) => ({ id }));
+    const collection = activeCollection((id: number, param: any) => ({ id }), {
+      gcTime: 1000,
+    });
 
     const param1 = { array: [1, 2, 3], test: { name: 12 } };
     const param2 = { test: { name: 12 }, array: [1, 2, 3] };
@@ -26,9 +32,9 @@ describe("createCollection", () => {
     expect(collection.get(1, param1)).not.toBe(collection.get(1, param3));
   });
 
-  it("Removes entry after inertia timeout", () => {
+  it("Removes entry after gcTime", () => {
     const collection = activeCollection((id: number) => ({ id }), {
-      inertia: 5000,
+      gcTime: 5000,
     });
 
     const value = collection.get(1);
@@ -43,7 +49,7 @@ describe("createCollection", () => {
 
   it("Doesn't remove entry if somebody is subscribed", () => {
     const collection = activeCollection((id: number) => ({ id }), {
-      inertia: 5000,
+      gcTime: 5000,
     });
 
     const value = collection.get(1);
