@@ -1,20 +1,23 @@
 import { Dependency, activeExternalState } from "./core";
 
 export interface ActiveMapOptions<S extends (...params: any) => any> {
-  initItem: S;
+  createItem: S;
   gcTime?: number;
+  gcCallback?: (...params: Parameters<S>) => void;
 }
 
 export interface ActiveMap<S extends (...args: any) => any> {
   type: "active-map";
+  has: (...params: Parameters<S>) => boolean;
   set: (...params: Parameters<S>) => { value: (value: ReturnType<S>) => void };
-  getOrInit: (...params: Parameters<S>) => ReturnType<S>;
+  getOrCreate: (...params: Parameters<S>) => ReturnType<S>;
   filter: (predicate: (...params: Parameters<S>) => boolean) => ReturnType<S>[];
 }
 
 export function activeMap<S extends (...params: any) => any>({
-  initItem,
+  createItem: initItem,
   gcTime = Number.POSITIVE_INFINITY,
+  gcCallback,
 }: ActiveMapOptions<S>): ActiveMap<S> {
   type R = ReturnType<S>;
   type P = Parameters<S>;
@@ -29,12 +32,17 @@ export function activeMap<S extends (...params: any) => any>({
       return entry;
     }
 
+    let isSubscribed = false;
     let version = 0;
     entry.topic = activeExternalState(
       () => version,
       () => {
+        isSubscribed = true;
         stopTimer();
-        return startTimer;
+        return () => {
+          isSubscribed = false;
+          startTimer();
+        };
       }
     );
 
@@ -55,8 +63,16 @@ export function activeMap<S extends (...params: any) => any>({
     }
 
     function onTimeout() {
-      cache.delete(key);
-      version += 1;
+      timeoutHandler = undefined;
+      if (!isSubscribed) {
+        gcCallback?.(...JSON.parse(key));
+      }
+
+      // Ensure that nobody subscribed in gcCallback
+      if (!isSubscribed) {
+        cache.delete(key);
+        version += 1;
+      }
     }
 
     startTimer();
@@ -66,7 +82,10 @@ export function activeMap<S extends (...params: any) => any>({
 
   return {
     type: "active-map" as const,
-    getOrInit(...params: P[]): R {
+    has(...params: P[]): boolean {
+      return cache.has(hashQueryKey(params));
+    },
+    getOrCreate(...params: P[]): R {
       const key = hashQueryKey(params);
       let result = cache.get(key)!;
       if (!cache.has(key)) {

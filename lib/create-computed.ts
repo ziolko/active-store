@@ -21,7 +21,7 @@ export function activeComputed<S extends (...args: any) => any>(
   type R = ReturnType<S>;
 
   const items = activeMap({
-    initItem: (...params: P) =>
+    createItem: (...params: P) =>
       createComputedSingle<R>(() => selector(...(params as any))),
     gcTime,
   });
@@ -29,13 +29,13 @@ export function activeComputed<S extends (...args: any) => any>(
   const result: ActiveComputed<S> = {
     type: "active-computed" as const,
     get(...params: P): R {
-      return items.getOrInit(...params).get();
+      return items.getOrCreate(...params).get();
     },
     state(...params: P): State<R> {
       try {
         return {
           status: "success",
-          data: items.getOrInit(...params).get(),
+          data: items.getOrCreate(...params).get(),
         };
       } catch (error: any) {
         if (error instanceof Promise || typeof error?.then === "function") {

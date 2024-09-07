@@ -79,34 +79,37 @@ function createTodoApp() {
 function activeLocalState<S extends ActiveQuery<any> | ActiveComputed<any>>(
   source: S
 ) {
-  let lastLocalValueId = 0;
-
-  const localValue = activeMap({
-    initItem: (...params: Parameters<S["get"]>) =>
+  const localValueMap = activeMap({
+    createItem: (...params: Parameters<S["get"]>) =>
       activeState<{ value: ReturnType<S["get"]>; id: number } | null>(null),
   });
 
+  let lastLocalValueId = 0;
   return {
+    ...activeComputed(
+      (...params: Parameters<S["get"]>): ReturnType<S["get"]> => {
+        const localState = localValueMap.getOrCreate(...params).get();
+        return localState === null ? source.get(...params) : localState.value;
+      }
+    ),
     local: (...params: Parameters<S["get"]>) => ({
       set(value: ReturnType<S["get"]>) {
         const currentId = (lastLocalValueId += 1);
-        localValue.getOrInit(...params).set({ value, id: lastLocalValueId });
+
+        localValueMap
+          .getOrCreate(...params)
+          .set({ value, id: lastLocalValueId });
+
         return function cancel() {
-          if (localValue.getOrInit(...params).get()?.id === currentId) {
-            localValue.getOrInit(...params).set(null);
+          if (localValueMap.getOrCreate(...params).get()?.id === currentId) {
+            localValueMap.getOrCreate(...params).set(null);
           }
         };
       },
       clear() {
-        localValue.getOrInit(...params).set(null);
+        localValueMap.getOrCreate(...params).set(null);
       },
     }),
-    ...activeComputed(
-      (...params: Parameters<S["get"]>): ReturnType<S["get"]> => {
-        const localState = localValue.getOrInit(...params).get();
-        return localState === null ? source.get(...params) : localState.value;
-      }
-    ),
   };
 }
 

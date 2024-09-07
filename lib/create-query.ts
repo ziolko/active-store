@@ -49,7 +49,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
   const collection = activeMap({
-    initItem: (...params: P) =>
+    createItem: (...params: P) =>
       createQuerySingle<R>(() => factory(...(params as any)), { gcTime }),
     gcTime: gcTime,
   });
@@ -57,7 +57,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
   const result = {
     type: "active-query" as const,
     get(...params: Parameters<S>) {
-      const item = collection.getOrInit(...(params as any));
+      const item = collection.getOrCreate(...(params as any));
       const promise = item.promise(); // start fetching data if it's not fetching yet
       const result = item.get();
 
@@ -66,12 +66,12 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       else throw promise;
     },
     state(...params: Parameters<S>) {
-      const item = collection.getOrInit(...(params as any));
+      const item = collection.getOrCreate(...(params as any));
       item.promise(); // start fetching data if it's not fetching yet
       return item.get() as any;
     },
     refetch(...params: Parameters<S>) {
-      return collection.getOrInit(...(params as any)).fetch() as any;
+      return collection.getOrCreate(...(params as any)).fetch() as any;
     },
     async invalidate(predicate: (...params: Parameters<S>) => boolean) {
       const promises: Promise<void>[] = [];
