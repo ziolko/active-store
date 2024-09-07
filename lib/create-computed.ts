@@ -1,29 +1,42 @@
 import { activeExternalState, compute, State } from "./core";
-import { activeCollection } from "./create-collection";
+import { activeMap } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
+export interface ActiveComputedOptions {
+  gcTime?: number;
+  enabled?: boolean;
+}
+
 export interface ActiveComputed<S extends (...args: any) => any> {
+  type: "active-computed";
   get: (...params: Parameters<S>) => ReturnType<S>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
 }
 
-export function activeComputed<S extends (...args: any) => any>(selector: S) {
+export function activeComputed<S extends (...args: any) => any>(
+  selector: S,
+  { gcTime = Number.POSITIVE_INFINITY }: ActiveComputedOptions = {}
+): ActiveComputed<S> {
   type P = Parameters<S>;
   type R = ReturnType<S>;
 
-  const collection = activeCollection(
-    (...params: P) =>
+  const items = activeMap({
+    initItem: (...params: P) =>
       createComputedSingle<R>(() => selector(...(params as any))),
-    { gcTime: Number.POSITIVE_INFINITY }
-  );
+    gcTime,
+  });
 
   const result: ActiveComputed<S> = {
+    type: "active-computed" as const,
     get(...params: P): R {
-      return collection.get(...params).get();
+      return items.getOrInit(...params).get();
     },
     state(...params: P): State<R> {
       try {
-        return { status: "success", data: collection.get(...params).get() };
+        return {
+          status: "success",
+          data: items.getOrInit(...params).get(),
+        };
       } catch (error: any) {
         if (error instanceof Promise || typeof error?.then === "function") {
           return { status: "pending" };
@@ -109,5 +122,5 @@ function createComputedSingle<R>(selector: () => R) {
     }
   );
 
-  return { get: () => topic.get() as R, subscribe: topic.subscribe };
+  return { get: () => topic.get() as R };
 }

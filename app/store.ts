@@ -1,4 +1,11 @@
-import { activeState, activeComputed, activeQuery } from "../lib";
+import {
+  activeState,
+  activeComputed,
+  activeQuery,
+  ActiveComputed,
+  ActiveQuery,
+} from "../lib";
+import { activeMap } from "../lib/create-collection";
 
 type ToDoItem = { id: number; name: string; isDone: boolean };
 
@@ -42,6 +49,20 @@ function createTodoApp() {
     return breeds.map((item) => item.toUpperCase());
   });
 
+  const query = activeQuery(
+    (name: string) =>
+      new Promise<string>((res) => setTimeout(() => res("Name: " + name), 3000))
+  );
+
+  const optimisticQuery = activeLocalState(query);
+
+  // optimisticQuery.
+
+  // issue.get();
+  // const unset = issue.local().set(["test"]);
+  // issue.local().clear();
+  // unset();
+
   return {
     newItem,
     items,
@@ -51,6 +72,41 @@ function createTodoApp() {
     addItem,
     removeItem,
     toggleItem,
+    optimisticQuery,
+  };
+}
+
+function activeLocalState<S extends ActiveQuery<any> | ActiveComputed<any>>(
+  source: S
+) {
+  let lastLocalValueId = 0;
+
+  const localValue = activeMap({
+    initItem: (...params: Parameters<S["get"]>) =>
+      activeState<{ value: ReturnType<S["get"]>; id: number } | null>(null),
+  });
+
+  return {
+    local: (...params: Parameters<S["get"]>) => ({
+      set(value: ReturnType<S["get"]>) {
+        const currentId = (lastLocalValueId += 1);
+        localValue.getOrInit(...params).set({ value, id: lastLocalValueId });
+        return function cancel() {
+          if (localValue.getOrInit(...params).get()?.id === currentId) {
+            localValue.getOrInit(...params).set(null);
+          }
+        };
+      },
+      clear() {
+        localValue.getOrInit(...params).set(null);
+      },
+    }),
+    ...activeComputed(
+      (...params: Parameters<S["get"]>): ReturnType<S["get"]> => {
+        const localState = localValue.getOrInit(...params).get();
+        return localState === null ? source.get(...params) : localState.value;
+      }
+    ),
   };
 }
 

@@ -1,21 +1,29 @@
 import { Dependency, activeExternalState } from "./core";
 
-export interface CollectionOptions {
-  gcTime: number;
+export interface ActiveMapOptions<S extends (...params: any) => any> {
+  initItem: S;
+  gcTime?: number;
 }
 
-export function activeCollection<S extends (...params: any) => any>(
-  selector: S,
-  { gcTime }: CollectionOptions
-) {
+export interface ActiveMap<S extends (...args: any) => any> {
+  type: "active-map";
+  set: (...params: Parameters<S>) => { value: (value: ReturnType<S>) => void };
+  getOrInit: (...params: Parameters<S>) => ReturnType<S>;
+  filter: (predicate: (...params: Parameters<S>) => boolean) => ReturnType<S>[];
+}
+
+export function activeMap<S extends (...params: any) => any>({
+  initItem,
+  gcTime = Number.POSITIVE_INFINITY,
+}: ActiveMapOptions<S>): ActiveMap<S> {
   type R = ReturnType<S>;
   type P = Parameters<S>;
 
   type CacheEntry = { data: R; topic?: Dependency };
   const cache = new Map<string, CacheEntry>();
 
-  function createCacheEntry(key: string, params: any) {
-    const entry: CacheEntry = { data: selector(...params) };
+  function createCacheEntry(key: string, data: R) {
+    const entry: CacheEntry = { data };
 
     if (gcTime === Number.POSITIVE_INFINITY) {
       return entry;
@@ -57,16 +65,29 @@ export function activeCollection<S extends (...params: any) => any>(
   }
 
   return {
-    get(...params: P): R {
+    type: "active-map" as const,
+    getOrInit(...params: P[]): R {
       const key = hashQueryKey(params);
       let result = cache.get(key)!;
       if (!cache.has(key)) {
-        result = createCacheEntry(key, params);
+        result = createCacheEntry(key, initItem(...params));
         cache.set(key, result);
       }
 
       result.topic?.get();
       return result.data;
+    },
+    set(...params: P) {
+      return {
+        value: (value: R) => {
+          const key = hashQueryKey(params);
+          let result = cache.get(key)!;
+          if (!cache.has(key)) {
+            result = createCacheEntry(key, value);
+            cache.set(key, result);
+          }
+        },
+      };
     },
     filter(predicate: (...params: P) => boolean): R[] {
       const result = [];

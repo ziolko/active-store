@@ -2,6 +2,7 @@
 import { __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as reactInternals } from "react";
 
 export interface ActiveExternalState<R> {
+  type: "active-external-state";
   get: () => R;
   state: () => State<R>;
   notify: () => void;
@@ -30,13 +31,20 @@ export function activeExternalState<R = any>(
   }
 
   const result: ActiveExternalState<R> = {
+    type: "active-external-state" as const,
     get() {
       if (
         reactInternals?.ReactCurrentOwner?.current &&
         !isRunningReactSelector.value
       ) {
         throw new Error(
-          "Accessing state value directly during React rendering is not allowed. Use useActive instead."
+          "Accessing active value directly during React rendering is not allowed. Use useActive instead."
+        );
+      }
+
+      if (isRunningQuerySelector.value) {
+        throw new Error(
+          "Accessing active value in active query does not make it reactive. Provide all active values as parameters to the query."
         );
       }
 
@@ -111,3 +119,4 @@ export function compute<R>(
 }
 
 export let isRunningReactSelector = { value: false };
+export let isRunningQuerySelector = { value: false };

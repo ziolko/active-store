@@ -1,5 +1,6 @@
-import { activeExternalState } from "./core";
-import { activeCollection } from "./create-collection";
+import { activeExternalState, isRunningQuerySelector } from "./core";
+import { activeMap } from "./create-collection";
+import { activeState } from "./create-state";
 
 type State<T> = {
   isPending: boolean;
@@ -14,11 +15,20 @@ type State<T> = {
   status: "pending" | "success" | "error";
 };
 
-export interface QueryOptions {
+export interface QueryOptions<S extends (...args: any) => Promise<any>> {
   gcTime?: number;
+  // TODO: implement options below
+  // initialData?: ReturnType<S> extends Promise<infer A>
+  //   ? A | ((...params: Parameters<S>) => boolean)
+  //   : never;
+  // refetchOnWindowFocus?: boolean | ((...params: Parameters<S>) => boolean);
+  // refetchOnReconnect?: boolean | ((...params: Parameters<S>) => boolean);
+  // refetchInterval?: number | false;
+  // refetchIntervalInBackground?: boolean;
 }
 
 export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
+  type: "active-query";
   get: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? A : never;
@@ -27,27 +37,27 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
   refetch: (...params: Parameters<S>) => ReturnType<S>;
   invalidate: (
-    predicate: (...params: Parameters<S>) => boolean,
-    options?: { clear: boolean }
+    predicate: (...params: Parameters<S>) => boolean
   ) => Promise<void>;
 }
 
 export function activeQuery<S extends (...args: any) => Promise<any>>(
   factory: S,
-  { gcTime = Number.POSITIVE_INFINITY }: QueryOptions = {}
+  { gcTime = Number.POSITIVE_INFINITY }: QueryOptions<S> = {}
 ): ActiveQuery<S> {
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
-  const collection = activeCollection(
-    (...params: P) =>
+  const collection = activeMap({
+    initItem: (...params: P) =>
       createQuerySingle<R>(() => factory(...(params as any)), { gcTime }),
-    { gcTime: gcTime }
-  );
+    gcTime: gcTime,
+  });
 
   const result = {
+    type: "active-query" as const,
     get(...params: Parameters<S>) {
-      const item = collection.get(...(params as any));
+      const item = collection.getOrInit(...(params as any));
       const promise = item.promise(); // start fetching data if it's not fetching yet
       const result = item.get();
 
@@ -56,12 +66,12 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       else throw promise;
     },
     state(...params: Parameters<S>) {
-      const item = collection.get(...(params as any));
+      const item = collection.getOrInit(...(params as any));
       item.promise(); // start fetching data if it's not fetching yet
       return item.get() as any;
     },
     refetch(...params: Parameters<S>) {
-      return collection.get(...(params as any)).fetch() as any;
+      return collection.getOrInit(...(params as any)).fetch() as any;
     },
     async invalidate(predicate: (...params: Parameters<S>) => boolean) {
       const promises: Promise<void>[] = [];
@@ -101,10 +111,10 @@ function createQuerySingle<R>(
     },
     function onSubscribe() {
       setTimeout(() => currentPromise ?? fetch(), 0);
-      handleGcTimeout({ clear: true, setup: true });
+      handleRefetchHooks({ clear: true, setup: true });
       isSubscribed = true;
       return () => {
-        handleGcTimeout({ clear: true, setup: false });
+        handleRefetchHooks({ clear: true, setup: false });
         isSubscribed = false;
         return null;
       };
@@ -112,12 +122,16 @@ function createQuerySingle<R>(
   );
 
   function fetch() {
-    handleGcTimeout({ clear: true, setup: true });
+    handleRefetchHooks({ clear: true, setup: true });
 
     let value: Promise<R>;
+    let wasRunningQuerySelector = isRunningQuerySelector.value;
     try {
+      isRunningQuerySelector.value = true;
       value = factory();
+      isRunningQuerySelector.value = wasRunningQuerySelector;
     } catch (error) {
+      isRunningQuerySelector.value = wasRunningQuerySelector;
       value = Promise.reject(error);
     }
     currentPromise = value;
@@ -171,7 +185,7 @@ function createQuerySingle<R>(
     return value;
   }
 
-  function handleGcTimeout(opts: { clear: boolean; setup: boolean }) {
+  function handleRefetchHooks(opts: { clear: boolean; setup: boolean }) {
     if (opts.clear && timeoutHandle) {
       clearTimeout(timeoutHandle);
       timeoutHandle = null;

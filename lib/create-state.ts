@@ -1,6 +1,7 @@
 import { activeExternalState, Dependency } from "./core";
 
 export interface ActiveState<V> {
+  type: "active-state";
   get: () => V;
   set: (value: V) => void;
   subscribe: (listener: (dependency: Dependency) => any) => () => void;
@@ -15,6 +16,7 @@ export function activeState<V>(initialValue: V) {
   );
 
   const result: ActiveState<V> = {
+    type: "active-state" as const,
     get: topic.get,
     set(newValue: V) {
       if (!Object.is(newValue, value)) {
