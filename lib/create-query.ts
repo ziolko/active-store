@@ -103,7 +103,9 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     type: "active-query" as const,
     get(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
-      const promise = item.promise().catch(() => null); // start fetching data if it's not fetching yet
+      // Start fetching data if it's not fetching yet. Errors are caught so that
+      // React suspense always renders the components
+      const promise = item.promiseWithCatchErrors();
       const result = item.get();
 
       if (result.isSuccess) return result.data!;
@@ -136,6 +138,7 @@ function createQuerySingle<R>(
   let isSubscribed = false;
   let currentState = getFullState(initialState);
   let currentPromise: any = null;
+  let currentPromiseWithCatchErrors: any = null;
 
   if (currentState.isSuccess && !currentState.isStale) {
     currentPromise = Promise.resolve(currentState.data);
@@ -150,7 +153,7 @@ function createQuerySingle<R>(
       return currentState;
     },
     function onSubscribe() {
-      setTimeout(() => currentPromise ?? fetch(), 0);
+      setTimeout(() => (currentPromise ? null : fetch()), 0);
       isSubscribed = true;
       return () => {
         isSubscribed = false;
@@ -218,16 +221,21 @@ function createQuerySingle<R>(
   async function invalidate() {
     currentState = { ...currentState, isStale: true };
     currentPromise = null;
+    currentPromiseWithCatchErrors = null;
     if (isSubscribed) {
       await fetch();
     }
   }
 
+  const getPromise = () => currentPromise ?? fetch();
+
   return {
     get: state.get,
     subscribe: state.subscribe,
-    promise: () => currentPromise ?? fetch(),
     fetch,
+    promise: getPromise,
+    promiseWithCatchErrors: () =>
+      (currentPromiseWithCatchErrors ??= getPromise().catch(() => null)),
     invalidate,
   };
 }
