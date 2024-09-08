@@ -112,7 +112,6 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
-      item.promise().catch(() => null); // start fetching data if it's not fetching yet
       return item.get() as any;
     },
     refetch(...params: Parameters<S>) {
@@ -217,7 +216,7 @@ function createQuerySingle<R>(
   }
 
   async function invalidate() {
-    currentState = currentState = { ...currentState, isStale: true };
+    currentState = { ...currentState, isStale: true };
     currentPromise = null;
     if (isSubscribed) {
       await fetch();
