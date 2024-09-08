@@ -25,6 +25,9 @@ describe("createQuery", () => {
 
   it("Returns isFetching after starting fetch", async () => {
     const query = activeQuery((id: number) => success(id));
+
+    expect(() => query.get(1)).toThrow();
+
     expect(query.state(1).status).toBe("pending");
     expect(query.state(1).isFetching).toBe(true);
     expect(query.state(1).isRefetching).toBe(false);
@@ -87,8 +90,10 @@ describe("createQuery", () => {
       initialState: (id) => ({ status: "success", data: -id, isStale: true }),
     });
     expect(query.state(1).isSuccess).toBe(true);
-    expect(query.state(1).isFetching).toBe(true);
+    expect(query.state(1).isStale).toBe(true);
+    expect(query.state(1).isFetching).toBe(false);
     expect(query.get(1)).toBe(-1);
+    expect(query.state(1).isFetching).toBe(true);
   });
 
   it("Throws provided initial error", async () => {

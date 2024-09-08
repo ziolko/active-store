@@ -234,8 +234,12 @@ function createQuerySingle<R>(
     subscribe: state.subscribe,
     fetch,
     promise: getPromise,
-    promiseWithCatchErrors: () =>
-      (currentPromiseWithCatchErrors ??= getPromise().catch(() => null)),
+    promiseWithCatchErrors: () => {
+      if (!currentPromiseWithCatchErrors) {
+        currentPromiseWithCatchErrors = getPromise().catch(() => null);
+      }
+      return currentPromiseWithCatchErrors;
+    },
     invalidate,
   };
 }
