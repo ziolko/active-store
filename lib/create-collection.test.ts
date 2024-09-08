@@ -81,4 +81,21 @@ describe("createCollection", () => {
     jest.advanceTimersByTime(5001);
     expect(collection.getOrCreate(1)).not.toBe(value);
   });
+
+  it("notifies when entry is set manually", () => {
+    const collection = activeMap({
+      createItem: (id: number) => ({ id }),
+    });
+
+    const { dependencies: topics } = compute(() => collection.getOrCreate(1));
+    const onChange = jest.fn(() => null);
+
+    for (const topic of topics) {
+      topic.subscribe(onChange);
+    }
+
+    collection.set(1).value({ id: -1 });
+
+    expect(onChange).toBeCalledTimes(1);
+  });
 });

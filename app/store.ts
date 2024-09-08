@@ -51,17 +51,15 @@ function createTodoApp() {
 
   const query = activeQuery(
     (name: string) =>
-      new Promise<string>((res) => setTimeout(() => res("Name: " + name), 3000))
+      new Promise<string>((res) => {
+        console.log("Refetch", name);
+        return setTimeout(() => res("Name: " + name), 3000);
+      })
   );
 
+  attacheRefetchOnTabVisible(query);
+
   const optimisticQuery = activeLocalState(query);
-
-  // optimisticQuery.
-
-  // issue.get();
-  // const unset = issue.local().set(["test"]);
-  // issue.local().clear();
-  // unset();
 
   return {
     newItem,
@@ -76,19 +74,27 @@ function createTodoApp() {
   };
 }
 
+function attacheRefetchOnTabVisible<S extends ActiveQuery<any>>(source: S) {
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      source.invalidate(() => true);
+    }
+  });
+}
+
 function activeLocalState<S extends ActiveQuery<any> | ActiveComputed<any>>(
   source: S
 ) {
   const localValueMap = activeMap({
     createItem: (...params: Parameters<S["get"]>) =>
-      activeState<{ value: ReturnType<S["get"]>; id: number } | null>(null),
+      null as { value: ReturnType<S["get"]>; id: number } | null,
   });
 
   let lastLocalValueId = 0;
   return {
     ...activeComputed(
       (...params: Parameters<S["get"]>): ReturnType<S["get"]> => {
-        const localState = localValueMap.getOrCreate(...params).get();
+        const localState = localValueMap.getOrCreate(...params);
         return localState === null ? source.get(...params) : localState.value;
       }
     ),
@@ -96,18 +102,16 @@ function activeLocalState<S extends ActiveQuery<any> | ActiveComputed<any>>(
       set(value: ReturnType<S["get"]>) {
         const currentId = (lastLocalValueId += 1);
 
-        localValueMap
-          .getOrCreate(...params)
-          .set({ value, id: lastLocalValueId });
+        localValueMap.set(...params).value({ value, id: lastLocalValueId });
 
         return function cancel() {
-          if (localValueMap.getOrCreate(...params).get()?.id === currentId) {
-            localValueMap.getOrCreate(...params).set(null);
+          if (localValueMap.getOrCreate(...params)?.id === currentId) {
+            localValueMap.set(...params).value(null);
           }
         };
       },
       clear() {
-        localValueMap.getOrCreate(...params).set(null);
+        localValueMap.set(...params).value(null);
       },
     }),
   };

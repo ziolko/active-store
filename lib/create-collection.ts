@@ -1,4 +1,4 @@
-import { Dependency, activeExternalState } from "./core";
+import { ActiveExternalState, Dependency, activeExternalState } from "./core";
 
 export interface ActiveMapOptions<S extends (...params: any) => any> {
   createItem: S;
@@ -8,7 +8,6 @@ export interface ActiveMapOptions<S extends (...params: any) => any> {
 
 export interface ActiveMap<S extends (...args: any) => any> {
   type: "active-map";
-  has: (...params: Parameters<S>) => boolean;
   set: (...params: Parameters<S>) => { value: (value: ReturnType<S>) => void };
   getOrCreate: (...params: Parameters<S>) => ReturnType<S>;
   filter: (predicate: (...params: Parameters<S>) => boolean) => ReturnType<S>[];
@@ -22,43 +21,47 @@ export function activeMap<S extends (...params: any) => any>({
   type R = ReturnType<S>;
   type P = Parameters<S>;
 
-  type CacheEntry = { data: R; topic?: Dependency };
+  type CacheEntry = {
+    data: R;
+    version: number;
+    topic: ActiveExternalState<number>;
+  };
   const cache = new Map<string, CacheEntry>();
 
   function createCacheEntry(key: string, data: R) {
-    const entry: CacheEntry = { data };
-
-    if (gcTime === Number.POSITIVE_INFINITY) {
-      return entry;
-    }
-
     let isSubscribed = false;
-    let version = 0;
-    entry.topic = activeExternalState(
-      () => version,
-      () => {
-        isSubscribed = true;
-        stopTimer();
-        return () => {
-          isSubscribed = false;
-          startTimer();
-        };
-      }
-    );
-
     let timeoutHandler: number | undefined;
 
+    const entry: CacheEntry = {
+      data,
+      version: 0,
+      topic: activeExternalState(
+        () => entry.version,
+        () => {
+          isSubscribed = true;
+          if (gcTime !== Number.POSITIVE_INFINITY) {
+            stopTimer();
+          }
+
+          return () => {
+            isSubscribed = false;
+            if (gcTime !== Number.POSITIVE_INFINITY) {
+              startTimer();
+            }
+          };
+        }
+      ),
+    };
+
     function startTimer() {
-      if (timeoutHandler) {
-        clearTimeout(timeoutHandler);
-      }
+      if (gcTime === Number.POSITIVE_INFINITY) return;
+      if (timeoutHandler) clearTimeout(timeoutHandler);
       timeoutHandler = setTimeout(onTimeout, gcTime) as any;
     }
 
     function stopTimer() {
-      if (timeoutHandler) {
-        clearTimeout(timeoutHandler);
-      }
+      if (gcTime === Number.POSITIVE_INFINITY) return;
+      if (timeoutHandler) clearTimeout(timeoutHandler);
       timeoutHandler = undefined;
     }
 
@@ -70,8 +73,8 @@ export function activeMap<S extends (...params: any) => any>({
 
       // Ensure that nobody subscribed in gcCallback
       if (!isSubscribed) {
+        entry.version += 1;
         cache.delete(key);
-        version += 1;
       }
     }
 
@@ -82,28 +85,28 @@ export function activeMap<S extends (...params: any) => any>({
 
   return {
     type: "active-map" as const,
-    has(...params: P[]): boolean {
-      return cache.has(hashQueryKey(params));
-    },
     getOrCreate(...params: P[]): R {
       const key = hashQueryKey(params);
       let result = cache.get(key)!;
-      if (!cache.has(key)) {
+      if (!result) {
         result = createCacheEntry(key, initItem(...params));
         cache.set(key, result);
       }
 
-      result.topic?.get();
+      result.topic.get();
       return result.data;
     },
     set(...params: P) {
       return {
         value: (value: R) => {
           const key = hashQueryKey(params);
-          let result = cache.get(key)!;
-          if (!cache.has(key)) {
-            result = createCacheEntry(key, value);
-            cache.set(key, result);
+          let entry = cache.get(key)!;
+          if (entry) {
+            entry.data = value;
+            entry.version += 1;
+            entry.topic?.notify();
+          } else {
+            cache.set(key, createCacheEntry(key, value));
           }
         },
       };

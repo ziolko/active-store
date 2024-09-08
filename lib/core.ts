@@ -4,15 +4,8 @@ import { __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as reactInternals } 
 export interface ActiveExternalState<R> {
   type: "active-external-state";
   get: () => R;
-  state: () => State<R>;
   notify: () => void;
   subscribe: (listener: (dependency: Dependency) => any) => () => void;
-}
-
-export interface State<R> {
-  status: "pending" | "success" | "error";
-  data?: R;
-  error?: any;
 }
 
 export function activeExternalState<R = any>(
@@ -42,25 +35,8 @@ export function activeExternalState<R = any>(
         );
       }
 
-      if (isRunningQuerySelector.value) {
-        throw new Error(
-          "Accessing active value in active query does not make it reactive. Provide all active values as parameters to the query."
-        );
-      }
-
       currentDependencies?.add(result as any);
       return get();
-    },
-    state() {
-      try {
-        return { status: "success", data: result.get() };
-      } catch (error: any) {
-        if (error instanceof Promise || typeof error?.then === "function") {
-          return { status: "pending" };
-        } else {
-          return { error, status: "error" };
-        }
-      }
     },
     notify,
     subscribe(listener: (dependency: Dependency) => void) {
@@ -119,4 +95,3 @@ export function compute<R>(
 }
 
 export let isRunningReactSelector = { value: false };
-export let isRunningQuerySelector = { value: false };

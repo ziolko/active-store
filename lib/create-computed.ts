@@ -1,10 +1,16 @@
-import { activeExternalState, compute, State } from "./core";
+import { activeExternalState, compute } from "./core";
 import { activeMap } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
 export interface ActiveComputedOptions {
   gcTime?: number;
   enabled?: boolean;
+}
+
+export interface State<R> {
+  status: "pending" | "success" | "error";
+  data?: R;
+  error?: any;
 }
 
 export interface ActiveComputed<S extends (...args: any) => any> {

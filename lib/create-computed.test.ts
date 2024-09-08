@@ -109,8 +109,10 @@ function createTestContext() {
 
   const { dependencies: topics } = compute(() => computed.get());
 
-  expect(topics.size).toEqual(1);
-  const topic = topics.values().next().value;
+  expect(topics.size).toEqual(2);
+  const iterator = topics.values();
+  iterator.next(); // skip the activeMap topic
+  const topic = iterator.next().value;
 
   return {
     hello,

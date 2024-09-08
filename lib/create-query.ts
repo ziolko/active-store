@@ -1,31 +1,41 @@
-import { activeExternalState, isRunningQuerySelector } from "./core";
+import { activeExternalState } from "./core";
 import { activeMap } from "./create-collection";
-import { activeState } from "./create-state";
 
-type State<T> = {
+type State<R> = {
   isPending: boolean;
   isSuccess: boolean;
   isError: boolean;
-  isLoading: boolean;
   isRefetching: boolean;
   isFetching: boolean;
   isStale: boolean;
-  data?: T;
+  data?: R;
   error?: any;
+  dataUpdatedAt?: number;
+  errorUpdatedAt?: number;
   status: "pending" | "success" | "error";
 };
 
-export interface QueryOptions<S extends (...args: any) => Promise<any>> {
+type InitialState<R> =
+  | { status: "pending" }
+  | {
+      status: "success";
+      data: R;
+      isStale: boolean;
+    }
+  | { status: "error"; error: any; isStale: boolean };
+
+type RetryDelayFunction<S extends (...args: any) => Promise<any>> = (
+  retryAttempt: number,
+  error: any
+) => number | false | ((...params: Parameters<S>) => number | false);
+
+export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
   gcTime?: number;
-  // TODO: implement options below
-  // initialData?: ReturnType<S> extends Promise<infer A>
-  //   ? A | ((...params: Parameters<S>) => boolean)
-  //   : never;
-  // refetchOnWindowFocus?: boolean | ((...params: Parameters<S>) => boolean);
-  // refetchOnReconnect?: boolean | ((...params: Parameters<S>) => boolean);
-  // refetchInterval?: number | false;
-  // refetchIntervalInBackground?: boolean;
-}
+  initialState?: (
+    ...params: Parameters<S>
+  ) => InitialState<ReturnType<S> extends Promise<infer A> ? A : never>;
+  retryDelay?: RetryDelayFunction<S>;
+};
 
 export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   type: "active-query";
@@ -43,22 +53,57 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
 
 export function activeQuery<S extends (...args: any) => Promise<any>>(
   factory: S,
-  { gcTime = Number.POSITIVE_INFINITY }: QueryOptions<S> = {}
+  options: ActiveQueryOptions<S> = {}
 ): ActiveQuery<S> {
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
   const collection = activeMap({
-    createItem: (...params: P) =>
-      createQuerySingle<R>(() => factory(...(params as any)), { gcTime }),
-    gcTime: gcTime,
+    createItem: (...params: P) => {
+      const initialState = options.initialState?.(...params) ?? {
+        status: "pending",
+      };
+      const getRetryDelay = (attempt: number, error: any) => {
+        if (!options.retryDelay) {
+          return attempt < 3 ? attempt * 1000 : false;
+        }
+        const result = options.retryDelay(attempt, error);
+        return typeof result === "function" ? result(...params) : result;
+      };
+      const factoryWithRetry = (): Promise<R> => {
+        function run(attempt: number): Promise<R> {
+          let promise: Promise<R>;
+          try {
+            promise = factory(...(params as any));
+          } catch (error) {
+            // if error is thrown synchronously, convert it to exception
+            promise = Promise.reject(error);
+          }
+
+          return promise.catch((error) => {
+            const retryDelay = getRetryDelay(attempt + 1, error);
+            if (retryDelay === false) {
+              throw error;
+            } else {
+              return new Promise((res) => setTimeout(res, retryDelay)).then(
+                () => run(attempt + 1)
+              );
+            }
+          });
+        }
+
+        return run(0);
+      };
+      return createQuerySingle<R>(factoryWithRetry, initialState);
+    },
+    gcTime: options.gcTime ?? Number.POSITIVE_INFINITY,
   });
 
   const result = {
     type: "active-query" as const,
     get(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
-      const promise = item.promise(); // start fetching data if it's not fetching yet
+      const promise = item.promise().catch(() => null); // start fetching data if it's not fetching yet
       const result = item.get();
 
       if (result.isSuccess) return result.data!;
@@ -67,7 +112,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
-      item.promise(); // start fetching data if it's not fetching yet
+      item.promise().catch(() => null); // start fetching data if it's not fetching yet
       return item.get() as any;
     },
     refetch(...params: Parameters<S>) {
@@ -87,23 +132,19 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
 
 function createQuerySingle<R>(
   factory: () => Promise<R>,
-  options: { gcTime: number }
+  initialState: InitialState<R>
 ) {
-  const initialState: State<R> = {
-    status: "pending",
-    isPending: true,
-    isSuccess: false,
-    isError: false,
-    isLoading: false,
-    isFetching: false,
-    isRefetching: false,
-    isStale: false,
-  };
-
   let isSubscribed = false;
+  let currentState = getFullState(initialState);
   let currentPromise: any = null;
-  let currentState = initialState;
-  let timeoutHandle: number | null = null;
+
+  if (currentState.isSuccess && !currentState.isStale) {
+    currentPromise = Promise.resolve(currentState.data);
+  }
+
+  if (currentState.isError && !currentState.isStale) {
+    currentPromise = Promise.reject(currentState.error);
+  }
 
   const state = activeExternalState(
     function get() {
@@ -111,27 +152,18 @@ function createQuerySingle<R>(
     },
     function onSubscribe() {
       setTimeout(() => currentPromise ?? fetch(), 0);
-      handleRefetchHooks({ clear: true, setup: true });
       isSubscribed = true;
       return () => {
-        handleRefetchHooks({ clear: true, setup: false });
         isSubscribed = false;
-        return null;
       };
     }
   );
 
   function fetch() {
-    handleRefetchHooks({ clear: true, setup: true });
-
     let value: Promise<R>;
-    let wasRunningQuerySelector = isRunningQuerySelector.value;
     try {
-      isRunningQuerySelector.value = true;
       value = factory();
-      isRunningQuerySelector.value = wasRunningQuerySelector;
     } catch (error) {
-      isRunningQuerySelector.value = wasRunningQuerySelector;
       value = Promise.reject(error);
     }
     currentPromise = value;
@@ -141,7 +173,6 @@ function createQuerySingle<R>(
     currentState = {
       ...currentState,
       isPending: isInitialLoading,
-      isLoading: isInitialLoading,
       isFetching: true,
       isRefetching: !isInitialLoading,
     };
@@ -154,13 +185,13 @@ function createQuerySingle<R>(
           currentState = {
             status: "success",
             isPending: false,
-            isLoading: false,
             isFetching: false,
             isRefetching: false,
             isSuccess: true,
             isError: false,
             isStale: false,
             data,
+            dataUpdatedAt: Date.now(),
           };
           state.notify();
         }
@@ -170,30 +201,19 @@ function createQuerySingle<R>(
           currentState = {
             status: error,
             isPending: false,
-            isLoading: false,
             isFetching: false,
             isRefetching: false,
             isSuccess: false,
             isError: true,
             isStale: false,
             error,
+            errorUpdatedAt: Date.now(),
           };
           state.notify();
         }
       }
     );
     return value;
-  }
-
-  function handleRefetchHooks(opts: { clear: boolean; setup: boolean }) {
-    if (opts.clear && timeoutHandle) {
-      clearTimeout(timeoutHandle);
-      timeoutHandle = null;
-    }
-
-    if (opts.setup && options.gcTime !== Number.POSITIVE_INFINITY) {
-      timeoutHandle = setTimeout(() => fetch(), options.gcTime) as any;
-    }
   }
 
   async function invalidate() {
@@ -210,5 +230,45 @@ function createQuerySingle<R>(
     promise: () => currentPromise ?? fetch(),
     fetch,
     invalidate,
+  };
+}
+
+function getFullState<R>(initialState: InitialState<R>): State<R> {
+  if (initialState.status === "success") {
+    return {
+      status: "success",
+      isPending: false,
+      isSuccess: true,
+      isError: false,
+      isFetching: false,
+      isRefetching: false,
+      data: initialState.data,
+      dataUpdatedAt: Date.now(),
+      isStale: initialState.isStale,
+    };
+  }
+
+  if (initialState.status === "error") {
+    return {
+      status: "error",
+      isPending: false,
+      isSuccess: false,
+      isError: true,
+      isFetching: false,
+      isRefetching: false,
+      error: initialState.error,
+      errorUpdatedAt: Date.now(),
+      isStale: initialState.isStale,
+    };
+  }
+
+  return {
+    status: "pending",
+    isPending: true,
+    isSuccess: false,
+    isError: false,
+    isFetching: false,
+    isRefetching: false,
+    isStale: false,
   };
 }
