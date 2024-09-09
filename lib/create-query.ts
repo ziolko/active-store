@@ -108,7 +108,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     get(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
       // Start fetching data if it's not fetching yet. Errors are caught so that
-      // React suspense always renders the components
+      // React suspense always re-renders the components instead of showing an error
       const promise = item.promiseWithCatchErrors();
       const result = item.get();
 

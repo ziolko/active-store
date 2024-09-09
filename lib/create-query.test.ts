@@ -109,6 +109,22 @@ describe("createQuery", () => {
     expect(() => query.get(1)).toThrowError("Initial error");
   });
 
+  it("Always throws the same promise object when query is pending", async () => {
+    const query = activeQuery(() => new Promise((res) => setTimeout(res, 100)));
+    const getResultPromise = () => {
+      try {
+        return query.get();
+      } catch (error) {
+        return error;
+      }
+    };
+
+    const firstPromise = getResultPromise();
+    const secondPromise = getResultPromise();
+
+    expect(firstPromise === secondPromise).toBeTruthy();
+  });
+
   const success = <T>(data: T) =>
     new Promise((resolve) => setTimeout(() => resolve(data), 500));
 
