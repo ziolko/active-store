@@ -99,7 +99,7 @@ describe("createComputed", () => {
         new Promise((resolve) => setTimeout(() => resolve("Hello world"), 2000))
     );
     const computed = activeComputed(() => query.get());
-    const promise = computed.promise();
+    const promise = computed.getAsync();
     await jest.advanceTimersByTimeAsync(5000);
     expect(await promise).toBe("Hello world");
   });
@@ -122,7 +122,7 @@ describe("createComputed", () => {
     expect(helloMock).not.toBeCalled();
     expect(worldMock).not.toBeCalled();
 
-    const promise = computed.promise();
+    const promise = computed.getAsync();
 
     expect(helloMock).toBeCalled();
     expect(worldMock).not.toBeCalled();
@@ -155,7 +155,7 @@ describe("createComputed", () => {
     expect(helloMock).not.toBeCalled();
     expect(worldMock).not.toBeCalled();
 
-    const promise = computed.promise();
+    const promise = computed.getAsync();
 
     expect(helloMock).toBeCalled();
     expect(worldMock).toBeCalled();

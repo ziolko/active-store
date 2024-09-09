@@ -46,6 +46,9 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   get: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? A : never;
+  getAsync: (
+    ...params: Parameters<S>
+  ) => ReturnType<S> extends Promise<infer A> ? Promise<A> : never;
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
@@ -115,6 +118,9 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       if (result.isSuccess) return result.data!;
       else if (result.isError) throw result.error!;
       else throw promise;
+    },
+    getAsync(...params: Parameters<S>) {
+      return collection.getOrCreate(...(params as any)).promise();
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));

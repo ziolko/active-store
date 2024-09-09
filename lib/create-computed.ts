@@ -16,7 +16,7 @@ export interface State<R> {
 export interface ActiveComputed<S extends (...args: any) => any> {
   type: "active-computed";
   get: (...params: Parameters<S>) => ReturnType<S>;
-  promise: (...params: Parameters<S>) => Promise<ReturnType<S>>;
+  getAsync: (...params: Parameters<S>) => Promise<ReturnType<S>>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
 }
 
@@ -38,7 +38,7 @@ export function activeComputed<S extends (...args: any) => any>(
     get(...params: P): R {
       return items.getOrCreate(...params).get();
     },
-    async promise(...params: P): Promise<R> {
+    async getAsync(...params: P): Promise<R> {
       while (true) {
         const wasRunningComputedPromise = isRunningComputedPromise.value;
         try {
