@@ -1,4 +1,4 @@
-import { activeExternalState, compute } from "./core";
+import { activeExternalState, compute, isRunningComputedPromise } from "./core";
 import { activeMap } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
@@ -16,6 +16,7 @@ export interface State<R> {
 export interface ActiveComputed<S extends (...args: any) => any> {
   type: "active-computed";
   get: (...params: Parameters<S>) => ReturnType<S>;
+  promise: (...params: Parameters<S>) => Promise<ReturnType<S>>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
 }
 
@@ -36,6 +37,25 @@ export function activeComputed<S extends (...args: any) => any>(
     type: "active-computed" as const,
     get(...params: P): R {
       return items.getOrCreate(...params).get();
+    },
+    async promise(...params: P): Promise<R> {
+      while (true) {
+        const wasRunningComputedPromise = isRunningComputedPromise.value;
+        try {
+          const item = items.getOrCreate(...params);
+          isRunningComputedPromise.value = true;
+          const result = item.get();
+          isRunningComputedPromise.value = wasRunningComputedPromise;
+          return result;
+        } catch (error: any) {
+          isRunningComputedPromise.value = wasRunningComputedPromise;
+          if (error instanceof Promise || typeof error?.then === "function") {
+            await error;
+          } else {
+            throw error;
+          }
+        }
+      }
     },
     state(...params: P): State<R> {
       try {

@@ -95,3 +95,4 @@ export function compute<R>(
 }
 
 export let isRunningReactSelector = { value: false };
+export let isRunningComputedPromise = { value: false };

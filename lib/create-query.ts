@@ -1,4 +1,8 @@
-import { activeExternalState } from "./core";
+import {
+  activeExternalState,
+  isRunningComputedPromise,
+  isRunningReactSelector,
+} from "./core";
 import { activeMap } from "./create-collection";
 
 type State<R> = {
@@ -114,6 +118,9 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
+      if (isRunningReactSelector.value || isRunningComputedPromise.value) {
+        item.promiseWithCatchErrors();
+      }
       return item.get() as any;
     },
     refetch(...params: Parameters<S>) {
@@ -169,6 +176,7 @@ function createQuerySingle<R>(
       value = Promise.reject(error);
     }
     currentPromise = value;
+    currentPromiseWithCatchErrors = null;
 
     const isInitialLoading = !currentState.isSuccess && !currentState.isError;
 

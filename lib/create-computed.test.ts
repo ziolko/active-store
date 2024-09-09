@@ -2,8 +2,11 @@ import { expect, describe, it, jest } from "@jest/globals";
 import { activeState } from "./create-state";
 import { activeComputed } from "./create-computed";
 import { activeExternalState, compute } from "./core";
+import { activeQuery } from "./create-query";
 
 describe("createComputed", () => {
+  jest.useFakeTimers();
+
   it("Returns computed value", () => {
     const { computed } = createTestContext();
     expect(computed.get().text).toEqual("Hello World");
@@ -88,6 +91,77 @@ describe("createComputed", () => {
     world.set("DEMO 2");
     expect(listener).toHaveBeenCalledTimes(2);
     expect(topic.get()).toEqual({ text: "Hello DEMO 2" });
+  });
+
+  it("computed.promise waits until query resolves", async () => {
+    const query = activeQuery(
+      () =>
+        new Promise((resolve) => setTimeout(() => resolve("Hello world"), 2000))
+    );
+    const computed = activeComputed(() => query.get());
+    const promise = computed.promise();
+    await jest.advanceTimersByTimeAsync(5000);
+    expect(await promise).toBe("Hello world");
+  });
+
+  it("computed.promise runs queries sequentially", async () => {
+    const helloMock = jest.fn(
+      () => new Promise((res) => setTimeout(() => res("Hello"), 2000))
+    );
+    const worldMock = jest.fn(
+      () => new Promise((res) => setTimeout(() => res("world"), 2000))
+    );
+
+    const helloQuery = activeQuery(helloMock);
+    const worldQuery = activeQuery(worldMock);
+
+    const computed = activeComputed(
+      () => `${helloQuery.get()} ${worldQuery.get()}`
+    );
+
+    expect(helloMock).not.toBeCalled();
+    expect(worldMock).not.toBeCalled();
+
+    const promise = computed.promise();
+
+    expect(helloMock).toBeCalled();
+    expect(worldMock).not.toBeCalled();
+
+    await jest.advanceTimersByTimeAsync(3000);
+
+    expect(helloMock).toBeCalled();
+    expect(worldMock).toBeCalled();
+
+    await jest.advanceTimersByTimeAsync(3000);
+    expect(await promise).toBe("Hello world");
+  });
+
+  it("computed.promise runs queries in parallel when prefetched with query.state", async () => {
+    const helloMock = jest.fn(
+      () => new Promise((res) => setTimeout(() => res("Hello"), 2000))
+    );
+    const worldMock = jest.fn(
+      () => new Promise((res) => setTimeout(() => res("world"), 2000))
+    );
+
+    const helloQuery = activeQuery(helloMock);
+    const worldQuery = activeQuery(worldMock);
+
+    const computed = activeComputed(() => {
+      [helloQuery.state(), worldQuery.state()]; // prefetch
+      return `${helloQuery.get()} ${worldQuery.get()}`;
+    });
+
+    expect(helloMock).not.toBeCalled();
+    expect(worldMock).not.toBeCalled();
+
+    const promise = computed.promise();
+
+    expect(helloMock).toBeCalled();
+    expect(worldMock).toBeCalled();
+
+    await jest.advanceTimersByTimeAsync(3000);
+    expect(await promise).toBe("Hello world");
   });
 });
 
