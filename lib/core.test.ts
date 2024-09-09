@@ -26,9 +26,18 @@ describe("createTopic", () => {
     notifyTopic!();
     expect(listener).not.toBeCalled();
   });
+
+  it("Throws error if get callback returns different object each time", () => {
+    const state = activeExternalState(
+      () => ({}),
+      () => () => null
+    );
+
+    expect(() => state.get()).toThrow();
+  });
 });
 
-describe("execute", () => {
+describe("compute", () => {
   it("Returns value from selector", () => {
     const { value } = compute(() => "test-value");
     expect(value).toEqual("test-value");

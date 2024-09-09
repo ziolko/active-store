@@ -23,6 +23,8 @@ export function activeExternalState<R = any>(
     }
   }
 
+  let shouldCheckIdentity = true;
+
   const result: ActiveExternalState<R> = {
     type: "active-external-state" as const,
     get() {
@@ -36,7 +38,21 @@ export function activeExternalState<R = any>(
       }
 
       currentDependencies?.add(result as any);
-      return get();
+      const data = get();
+
+      if (shouldCheckIdentity && data !== get()) {
+        console.error(
+          "activeExternalState getter must return the same object when called two times in a row",
+          get
+        );
+
+        throw new Error(
+          "activeExternalState getter must return the same object when called two times in a row"
+        );
+      }
+
+      shouldCheckIdentity = false;
+      return data;
     },
     notify,
     subscribe(listener: (dependency: Dependency) => void) {
