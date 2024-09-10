@@ -8,12 +8,16 @@ type ExcludeMethods<T> = {
   [P in keyof T]: T[P] extends Function ? never : ExcludeMethods<T[P]>;
 };
 
-export function useActive<
-  S extends () => ReturnType<S> extends Function ? never : ReturnType<S>
->(selector: S): ExcludeMethods<ReturnType<S>> {
+export function useActive<S extends (() => any) | { get: () => any }>(
+  selector: S extends () => infer R ? (R extends Function ? never : S) : S
+): S extends { get: () => infer R }
+  ? ExcludeMethods<R>
+  : S extends () => infer R
+  ? ExcludeMethods<R>
+  : never {
   const [state] = useState(createActiveSelectorState);
   const result = useSyncExternalStore(state.subscribe, () =>
-    state.getSnapshot(selector)
+    state.getSnapshot(typeof selector === "function" ? selector : selector.get)
   );
 
   if (typeof (result as any)?.then === "function") {

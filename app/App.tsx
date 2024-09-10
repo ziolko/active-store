@@ -13,6 +13,7 @@ export default function () {
 
 function App() {
   const optimistic = useActive(() => store.optimisticQuery.get("mateusz"));
+  const breed = useActive(store.breedUpperCase);
 
   return (
     <div>
@@ -28,6 +29,11 @@ function App() {
           Reset
         </button>
       </div>
+      <ol>
+        {breed.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+      </ol>
     </div>
   );
 }
