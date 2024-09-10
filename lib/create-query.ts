@@ -215,7 +215,7 @@ function createQuerySingle<R>(
       (error: any) => {
         if (value === currentPromise) {
           currentState = {
-            status: error,
+            status: "error",
             isPending: false,
             isFetching: false,
             isRefetching: false,
@@ -224,6 +224,8 @@ function createQuerySingle<R>(
             isStale: false,
             error,
             errorUpdatedAt: Date.now(),
+            data: currentState.data,
+            dataUpdatedAt: currentState.dataUpdatedAt,
           };
           state.notify();
         }
