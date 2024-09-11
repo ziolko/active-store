@@ -17,6 +17,7 @@ type State<R> = {
   dataUpdatedAt?: number;
   errorUpdatedAt?: number;
   status: "pending" | "success" | "error";
+  fetchStatus: "fetching" | "paused" | "idle";
 };
 
 type InitialState<R> =
@@ -189,6 +190,7 @@ function createQuerySingle<R>(
     currentState = {
       ...currentState,
       isPending: isInitialLoading,
+      fetchStatus: "fetching",
       isFetching: true,
       isRefetching: !isInitialLoading,
     };
@@ -200,6 +202,7 @@ function createQuerySingle<R>(
         if (value === currentPromise) {
           currentState = {
             status: "success",
+            fetchStatus: "idle",
             isPending: false,
             isFetching: false,
             isRefetching: false,
@@ -216,6 +219,7 @@ function createQuerySingle<R>(
         if (value === currentPromise) {
           currentState = {
             status: "error",
+            fetchStatus: "idle",
             isPending: false,
             isFetching: false,
             isRefetching: false,
@@ -264,6 +268,7 @@ function getFullState<R>(initialState: InitialState<R>): State<R> {
   if (initialState.status === "success") {
     return {
       status: "success",
+      fetchStatus: "idle",
       isPending: false,
       isSuccess: true,
       isError: false,
@@ -278,6 +283,7 @@ function getFullState<R>(initialState: InitialState<R>): State<R> {
   if (initialState.status === "error") {
     return {
       status: "error",
+      fetchStatus: "idle",
       isPending: false,
       isSuccess: false,
       isError: true,
@@ -291,6 +297,7 @@ function getFullState<R>(initialState: InitialState<R>): State<R> {
 
   return {
     status: "pending",
+    fetchStatus: "idle",
     isPending: true,
     isSuccess: false,
     isError: false,
