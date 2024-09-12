@@ -1,13 +1,31 @@
-import { Suspense } from "react";
-
 import store from "./store";
-import { useActive } from "../lib";
+import { useActive, ActiveBoundary, ActiveBoundaryErrorProps } from "../lib";
 
 export default function () {
   return (
-    <Suspense fallback="Loading...">
+    <ActiveBoundary
+      fallback="Loading..."
+      errorFallback={ErrorHandler}
+      onError={(err) => console.log("My error", err)}
+    >
       <App />
-    </Suspense>
+    </ActiveBoundary>
+  );
+}
+
+function ErrorHandler(props: ActiveBoundaryErrorProps) {
+  return (
+    <div>
+      Error: {props.error.message}{" "}
+      <button
+        onClick={() => {
+          store.resetBreedList();
+          props.resetError();
+        }}
+      >
+        Retry
+      </button>
+    </div>
   );
 }
 

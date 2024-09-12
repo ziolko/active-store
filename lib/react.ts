@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useState } from "react";
+import React, { useSyncExternalStore, useState } from "react";
 import shallowequal from "shallowequal";
 
 import { compute, isRunningReactSelector } from "./core";
@@ -80,4 +80,88 @@ function createActiveSelectorState() {
       }
     },
   };
+}
+
+export type ActiveBoundaryErrorProps = {
+  error: Error;
+  resetError: (...args: any) => void;
+};
+
+export type ActiveBoundaryProps<R = any> = React.PropsWithChildren<{
+  fallback?: React.ReactNode | React.JSXElementConstructor<{}>;
+
+  errorFallback?:
+    | React.ReactNode
+    | React.JSXElementConstructor<ActiveBoundaryErrorProps>;
+
+  onError?: (error: Error, info: React.ErrorInfo) => void;
+  onErrorReset?: (...args: R[]) => void;
+}>;
+
+type ActiveBoundaryState = {
+  didCatch: boolean;
+  error: Error | null;
+};
+
+const initialState: ActiveBoundaryState = {
+  didCatch: false,
+  error: null,
+};
+
+/**
+ * Attribution: The ActiveBoundary component is based on the react-error-boundary library
+ */
+export class ActiveBoundary extends React.PureComponent<
+  ActiveBoundaryProps,
+  ActiveBoundaryState
+> {
+  constructor(props: ActiveBoundaryProps) {
+    super(props);
+    this.state = initialState;
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { didCatch: true, error };
+  }
+
+  resetError = (...args: any) => {
+    const { error } = this.state;
+
+    if (error !== null) {
+      this.props.onErrorReset?.(...args);
+      this.setState(initialState);
+    }
+  };
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    this.props.onError?.(error, info);
+  }
+
+  render() {
+    const { children, fallback, errorFallback } = this.props;
+    const { didCatch, error } = this.state;
+
+    if (didCatch && typeof errorFallback === "function") {
+      return React.createElement(errorFallback, {
+        resetError: this.resetError,
+        error: error!,
+      });
+    } else if (didCatch && typeof errorFallback !== "undefined") {
+      return errorFallback as React.ReactNode;
+    } else if (didCatch) {
+      throw error;
+    }
+
+    if (typeof fallback === "function") {
+      return React.createElement(
+        React.Suspense,
+        { fallback: React.createElement(fallback) },
+        children
+      );
+    } else if (typeof fallback !== "undefined") {
+      return React.createElement(React.Suspense, { fallback }, children);
+    } else {
+      return children;
+    }
+  }
 }

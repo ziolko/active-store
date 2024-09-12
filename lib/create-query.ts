@@ -55,7 +55,8 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
   refetch: (...params: Parameters<S>) => ReturnType<S>;
   invalidate: (
-    predicate: (...params: Parameters<S>) => boolean
+    predicate?: ((...params: Parameters<S>) => boolean) | true,
+    options?: { reset?: boolean }
   ) => Promise<void>;
 }
 
@@ -113,7 +114,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       const item = collection.getOrCreate(...(params as any));
       // Start fetching data if it's not fetching yet. Errors are caught so that
       // React suspense always re-renders the components instead of showing an error
-      const promise = item.promiseWithCatchErrors();
+      const promise = item.promiseForSuspense();
       const result = item.get();
 
       if (result.isSuccess) return result.data!;
@@ -126,17 +127,21 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
       if (isRunningReactSelector.value || isRunningComputedPromise.value) {
-        item.promiseWithCatchErrors();
+        item.promiseForSuspense();
       }
       return item.get() as any;
     },
     refetch(...params: Parameters<S>) {
       return collection.getOrCreate(...(params as any)).fetch() as any;
     },
-    async invalidate(predicate: (...params: Parameters<S>) => boolean) {
+    async invalidate(
+      predicate?: ((...params: Parameters<S>) => boolean) | true,
+      options?: { reset?: boolean }
+    ) {
       const promises: Promise<void>[] = [];
+      predicate = typeof predicate === "function" ? predicate : () => true;
       for (const item of collection.filter(predicate)) {
-        promises.push(item.invalidate());
+        promises.push(item.invalidate(options?.reset));
       }
       await Promise.all(promises);
     },
@@ -152,7 +157,7 @@ function createQuerySingle<R>(
   let isSubscribed = false;
   let currentState = getFullState(initialState);
   let currentPromise: any = null;
-  let currentPromiseWithCatchErrors: any = null;
+  let currentPromiseForSuspense: any = null;
 
   if (currentState.isSuccess && !currentState.isStale) {
     currentPromise = Promise.resolve(currentState.data);
@@ -183,7 +188,7 @@ function createQuerySingle<R>(
       value = Promise.reject(error);
     }
     currentPromise = value;
-    currentPromiseWithCatchErrors = null;
+    currentPromiseForSuspense = null;
 
     const isInitialLoading = !currentState.isSuccess && !currentState.isError;
 
@@ -238,10 +243,12 @@ function createQuerySingle<R>(
     return value;
   }
 
-  async function invalidate() {
-    currentState = { ...currentState, isStale: true };
+  async function invalidate(reset?: boolean) {
+    currentState = reset
+      ? getFullState({ status: "pending" })
+      : { ...currentState, isStale: true };
     currentPromise = null;
-    currentPromiseWithCatchErrors = null;
+    currentPromiseForSuspense = null;
     if (isSubscribed) {
       await fetch();
     }
@@ -254,11 +261,18 @@ function createQuerySingle<R>(
     subscribe: state.subscribe,
     fetch,
     promise: getPromise,
-    promiseWithCatchErrors: () => {
-      if (!currentPromiseWithCatchErrors) {
-        currentPromiseWithCatchErrors = getPromise().catch(() => null);
+    promiseForSuspense: () => {
+      if (!currentPromiseForSuspense) {
+        const promise = getPromise().catch(() => null);
+        currentPromiseForSuspense = Error(
+          "Suspense Exception: This is not a real error! It's an implementation detail of `activeQuery` to interrupt the current render. You must rethrow it immediately. Capturing without rethrowing will lead to unexpected behavior.\n\nTo handle async errors, wrap your component in an ActiveBoundary."
+        );
+        currentPromiseForSuspense.then = Promise.prototype.then.bind(promise);
+        currentPromiseForSuspense.catch = Promise.prototype.catch.bind(promise);
+        currentPromiseForSuspense.finally =
+          Promise.prototype.finally.bind(promise);
       }
-      return currentPromiseWithCatchErrors;
+      return currentPromiseForSuspense;
     },
     invalidate,
   };

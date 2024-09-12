@@ -66,6 +66,7 @@ function createTodoApp() {
     items,
     count,
     breedList,
+    resetBreedList: () => breedList.invalidate(true, { reset: true }),
     breedUpperCase,
     addItem,
     removeItem,
