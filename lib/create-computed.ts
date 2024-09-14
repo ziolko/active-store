@@ -19,7 +19,7 @@ export interface ActiveComputed<S extends (...args: any) => any> {
   getAsync: (...params: Parameters<S>) => Promise<ReturnType<S>>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
   subscribe: (...params: Parameters<S>) => {
-    with: (listener: () => () => void) => void;
+    with: (listener: () => void) => () => void;
   };
 }
 
@@ -76,7 +76,7 @@ export function activeComputed<S extends (...args: any) => any>(
     },
     subscribe(...params: P) {
       return {
-        with: (listener: () => () => void) =>
+        with: (listener: () => void) =>
           items.getOrCreate(...params).subscribe(listener),
       };
     },
