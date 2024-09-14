@@ -18,6 +18,9 @@ export interface ActiveComputed<S extends (...args: any) => any> {
   get: (...params: Parameters<S>) => ReturnType<S>;
   getAsync: (...params: Parameters<S>) => Promise<ReturnType<S>>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
+  subscribe: (...params: Parameters<S>) => {
+    with: (listener: () => () => void) => void;
+  };
 }
 
 export function activeComputed<S extends (...args: any) => any>(
@@ -70,6 +73,12 @@ export function activeComputed<S extends (...args: any) => any>(
           return { error, status: "error" };
         }
       }
+    },
+    subscribe(...params: P) {
+      return {
+        with: (listener: () => () => void) =>
+          items.getOrCreate(...params).subscribe(listener),
+      };
     },
   };
 
@@ -148,5 +157,5 @@ function createComputedSingle<R>(selector: () => R) {
     }
   );
 
-  return { get: () => topic.get() as R };
+  return { get: () => topic.get() as R, subscribe: topic.subscribe };
 }
