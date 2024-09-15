@@ -41,8 +41,9 @@ function activeAppStore() {
     // in the databases using active-store
     const login = userLogin.get();
 
-    // start fetching data from activeQuery for currently selected github login.
-    // The line below will suspense until github profile finishes loading.
+    // start fetching data from activeQuery for currently
+    // selected github login. The line below will suspend until
+    // github profile finishes loading.
     // There's no need for special handling of the async loading state.
     return githubProfile.get(login);
   });
@@ -207,7 +208,10 @@ query.invalidateOne("hello", "world");
 // Options:
 // - reset (default false) - reset the query to the initial state
 //                           (idle, with no data or error)
-query.invalidate(selctor: (...args: P) => boolean, options: { reset?: boolean });
+query.invalidate(
+  selector: (...args: P) => boolean,
+  options?: { reset?: boolean }
+);
 ```
 
 ### activeComputed
