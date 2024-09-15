@@ -59,7 +59,8 @@ function activeAppStore() {
 
 const store = activeAppStore(); // Create an instance of the store
 
-// Define a helper hook 'useStore' to get an instance of the store in your components
+// Define a helper hook 'useStore' to get an instance
+// of the store in your components
 const storeContext = createContext<ReturnType<typeof activeAppStore>>(store);
 export const useStore = () => useContext(storeContext);
 ```
@@ -114,8 +115,12 @@ function CurrentUserPicker() {
 
 function GithubProfile() {
   const store = useStore();
-  const profile = useActive(store.profile); // React will suspense until the data is loaded
-  const name = useActive(store.userName); // React will suspense until the data is loaded
+
+  // React will suspend until the data is loaded
+  const profile = useActive(store.profile);
+
+  // React will suspend until the data is loaded
+  const name = useActive(store.userName);
 
   return (
     <div>
@@ -143,12 +148,13 @@ const state = activeState<T>(initialState: T);
 // Returns the current value of the state
 state.get();
 
-// Sets new value for the state. Trigers re-renders of components that depend on it.
-// Triggers invalidation on activeComputed that depend on it.
+// Sets new value for the state. Trigers re-renders of
+// components that depend on it. Triggers invalidation
+// on activeComputed that depend on it.
 state.set(newValue: T);
 
-// Manually subscribes to changes in the state. Takes a listener as a parameter
-// Retruns unsubscribe function
+// Manually subscribes to changes in the state.
+// Takes a listener as a parameter Retruns unsubscribe function
 state.subscribe(listener: (dependency: Dependency) => any) => () => void;
 ```
 
@@ -166,12 +172,13 @@ const query = activeQuery(factory: (...args: P) => Promise<R>);
 
 // If the query for "hello" "world" has already resolved, returns the value.
 // If it rejected it throws the rejection reason as an exception
-// If query is pending, it throws a React Suspense error that suspenses rendering
-// React components and activeComputed (more on this below).
+// If query is pending, it throws a React Suspense error that
+// suspenses rendering React components and activeComputed
+// (more on this below).
 query.get("hello", "world");
 
-// Returns the current state of the query. The returned state has the following
-// fields that are identical to react-query
+// Returns the current state of the query. The returned state
+// has the following fields that are very similar to react-query
 // - status: "pending" | "success" | "error";
 // - isPending: boolean;
 // - isSuccess: boolean;
@@ -190,14 +197,17 @@ query.state("hello", "world");
 query.getAsync("hello" ,"world");
 
 // Invalidate query for given parameters - will mark data as stale
-// and refetch if any component uses the query (either directly or through activeComputed)
+// and refetch if any component uses the query (either directly, or
+// through activeComputed)
 query.invalidateOne("hello", "world");
 
-// Invalidate query for all entries for which selector returns true. This marks data as stale
-// and refetch queries used in any visible React component (either directly or through activeComputed)
+// Invalidate query for all entries for which selector returns true.
+// This marks data as stale and refetch queries used in any visible
+// React component (either directly or through activeComputed)
 // Options:
-// - reset (default false) - reset the query to the initial state (idle, with no data or error)
-query.invalidate(selctor: (...args: P) => boolean, options: { reset?: boolean } | { markStale?: boolean });
+// - reset (default false) - reset the query to the initial state
+//                           (idle, with no data or error)
+query.invalidate(selctor: (...args: P) => boolean, options: { reset?: boolean });
 ```
 
 ### activeComputed
@@ -206,22 +216,29 @@ Creates a computed state based on any other active state. If any React component
 recomputes automatically whenever any of its dependency changes.
 
 ```typescript
-// The provided factory function must not be async (or return a Promise) - TypeScript will complain when this happens.
-// You can use any combination of activeState, activeQuery or activeComputed inside.
+// The provided factory function must not be async
+// (or return a Promise) - TypeScript will complain when this happens.
+// You can use any combination of activeState, activeQuery, or
+// activeComputed inside.
 const computed = activeComputed(factory: (...args: P) => R);
 
-// As active computed can depend on active query, it has to follow its async semantics:
-// If the computed for "hello" "world" has already resolved, returns the value.
-// If it rejected it throws the rejection reason as an exception
-// If it's pending, it throws a React Suspense error that suspenses rendering
-// React components and activeComputed that depend on it (more on this below).
+// As active computed can depend on active query, it has to
+// follow its async semantics:
+// - If the computed for "hello" "world" has already resolved,
+//   returns the value.
+// - If it rejected it throws the rejection reason
+//   as an exception
+// - If it's pending, it throws a React Suspense error that
+//   suspends rendering React components and activeComputed
+//   that depend on it (more on this below).
 computed.get("hello", "world");
 
 // Returns a promise for computed for given parameters
 computed.getAsync("hello", "world");
 
 
-// Returns the current state of the computed value. The returned state has the following fields:
+// Returns the current state of the computed value.
+// The returned state has the following fields:
 // - status: "pending" | "success" | "error";
 // - data?
 // - error?
@@ -237,17 +254,19 @@ It's like `useSelector` from Redux. It connects your components with store.
 // Every time the value changes, component is re-rendered.
 const value = useActive(() => store.computed.get(userId));
 
-// If `get` doesn't take any parameters, you can just pass a reference to the getter:
+// If `get` doesn't take any parameters, you can just pass
+// a reference to the getter:
 const value = useActive(store.currentUser.get);
 
-// For convenience you can skip the `.get` part and `useActive` will call it automatically:
+// For convenience you can skip the `.get` part and
+// `useActive` will call it automatically:
 const value = useActive(store.currentUser);
 ```
 
 ### ActiveBoundary
 
-Active boundary wraps a section of the app that loads and fails together. It's basically `<Suspense>`
-and React error boundary in a single component.
+Active boundary wraps a section of the app that loads and fails together.
+It's basically `<Suspense>` and React error boundary in a single component.
 
 - fallback is used while data required to load child components is loading.
 - errorFallback is used when any of the data fails to load with an exception
@@ -266,7 +285,7 @@ exception is _also_ a Promise.
 When the promise resolves, React re-renders the component so `activeComputed` recomputes the value and this time
 the query is already resolved so it successfully computes the value.
 
-## Low lever primitives
+## Low level primitives
 
 ### activeExternalState
 
