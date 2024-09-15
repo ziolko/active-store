@@ -1,6 +1,6 @@
 {
   "name": "active-store",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "",
   "scripts": {
     "test": "jest",
@@ -9,6 +9,11 @@
     "build": "vite build",
     "prepublishOnly": "vite build"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziolko/active-store.git"
+  },
+  "homepage": "https://github.com/ziolko/active-store",
   "type": "module",
   "files": [
     "dist"

@@ -127,9 +127,9 @@ function GithubProfile() {
 
 ## Examples
 
-- [Custom utility activeDeferred acting like useDeferredValue](https://stackblitz.com/edit/vitejs-vite-f9y5fn?file=src%2FApp.tsx)
 - [Simple store for a feedback form with a single input](https://github.com/roombelt/timeline/blob/main/src/store/feedback.ts)
 - [An example of a splitting a big store into several smaller stores](https://github.com/roombelt/timeline/blob/main/src/store/index.ts)
+- [Custom utility activeDeferred acting like useDeferredValue](https://stackblitz.com/edit/vitejs-vite-f9y5fn?file=src%2FApp.tsx)
 
 ## Reference
 
