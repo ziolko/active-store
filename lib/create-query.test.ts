@@ -1,5 +1,6 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { activeQuery } from "./create-query";
+import { activeComputed } from "./create-computed";
 
 describe("createQuery", () => {
   jest.useFakeTimers();
@@ -34,23 +35,33 @@ describe("createQuery", () => {
     await jest.advanceTimersByTimeAsync(2000);
   });
 
-  it("Returns isUpdating on subsequent fetch", async () => {
+  it("Returns isUpdating when invalidated and there's an active subscription", async () => {
     const query = activeQuery((id: number) => success(id));
+
+    // Start a subscription
+    const unsubscribe = activeComputed(() => query.get(1))
+      .subscribe()
+      .with(() => null);
+
     expect(query.state(1).status).toBe("pending");
-    query.refetch(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).status).toBe("success");
 
-    query.refetch(1);
+    query.invalidateOne(1);
     await jest.advanceTimersByTimeAsync(10);
 
     expect(query.state(1).isPending).toBe(false);
     expect(query.state(1).isRefetching).toBe(true);
+
+    await jest.advanceTimersByTimeAsync(2000);
+    expect(query.state(1).isRefetching).toBe(false);
+
+    unsubscribe();
   });
 
   it("Returns hasSuccess after fetch is done", async () => {
     const query = activeQuery((id: number) => success(id));
-    query.refetch(1);
+    query.getAsync(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isSuccess).toBe(true);
     expect(query.get(1)).toBe(1);
@@ -60,7 +71,7 @@ describe("createQuery", () => {
     const query = activeQuery((id: number) => failure(id), {
       retryDelay: () => false,
     });
-    query.refetch(1);
+    query.getAsync(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isError).toBe(true);
     expect(() => query.get(1)).toThrow();
@@ -69,7 +80,7 @@ describe("createQuery", () => {
   it("By default retries 2 times after initial fetch fails", async () => {
     const factory = jest.fn((id: number) => failure(id));
     const query = activeQuery(factory);
-    query.refetch(1);
+    query.getAsync(1);
     await jest.advanceTimersByTimeAsync(5000);
     expect(query.state(1).isError).toBe(true);
     expect(() => query.get(1)).toThrow();

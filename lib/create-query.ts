@@ -53,7 +53,7 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
-  refetch: (...params: Parameters<S>) => ReturnType<S>;
+  invalidateOne: (...params: Parameters<S>) => ReturnType<S>;
   invalidate: (
     predicate?: ((...params: Parameters<S>) => boolean) | true,
     options?: { reset?: boolean }
@@ -131,8 +131,8 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       }
       return item.get() as any;
     },
-    refetch(...params: Parameters<S>) {
-      return collection.getOrCreate(...(params as any)).fetch() as any;
+    invalidateOne(...params: Parameters<S>) {
+      return collection.getOrCreate(...(params as any)).invalidate() as any;
     },
     async invalidate(
       predicate?: ((...params: Parameters<S>) => boolean) | true,
@@ -250,7 +250,7 @@ function createQuerySingle<R>(
     currentPromise = null;
     currentPromiseForSuspense = null;
     if (isSubscribed) {
-      await fetch();
+      await fetch().catch(() => null);
     }
   }
 
