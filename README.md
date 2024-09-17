@@ -156,13 +156,13 @@ state.get();
 state.set(newValue: T);
 
 // Manually subscribes to changes in the state.
-// Takes a listener as a parameter Retruns unsubscribe function
+// Takes a listener as a parameter. Returns unsubscribe function.
 state.subscribe(listener: (dependency: Dependency) => any) => () => void;
 ```
 
 ### activeQuery
 
-This is heaviy based on React Query, so if you are familiar with this library you will feel like home.
+This is heavily based on React Query, so if you are familiar with this library you will feel like home.
 
 ```typescript
 // Create a query with a factor function returning promise.
