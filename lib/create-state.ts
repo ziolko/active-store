@@ -10,7 +10,10 @@ export interface ActiveState<V> {
 export function activeState<V>(
   initialValue: V,
   options: {
-    onSubscribe?: (set: (value: V) => void, get: () => V) => () => void;
+    onSubscribe?: (item: {
+      get: () => V;
+      set: (value: V) => void;
+    }) => () => void;
   } = {}
 ) {
   let value = initialValue;
@@ -26,7 +29,7 @@ export function activeState<V>(
     () => value,
     (): (() => void) => {
       if (options?.onSubscribe) {
-        return options?.onSubscribe(setValue, topic.get);
+        return options?.onSubscribe({ get: topic.get, set: setValue });
       } else {
         return () => null;
       }
