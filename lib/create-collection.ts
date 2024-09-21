@@ -7,10 +7,10 @@ export interface ActiveMapOptions<S extends (...params: any) => any> {
 }
 
 export interface ActiveMap<S extends (...args: any) => any> {
-  type: "active-map";
-  set: (...params: Parameters<S>) => { value: (value: ReturnType<S>) => void };
   getOrCreate: (...params: Parameters<S>) => ReturnType<S>;
   filter: (predicate: (...params: Parameters<S>) => boolean) => ReturnType<S>[];
+  set: (value: ReturnType<S>, ...params: Parameters<S>) => void;
+  subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
 export function activeMap<S extends (...params: any) => any>({
@@ -84,7 +84,6 @@ export function activeMap<S extends (...params: any) => any>({
   }
 
   return {
-    type: "active-map" as const,
     getOrCreate(...params: P[]): R {
       const key = hashQueryKey(params);
       let result = cache.get(key)!;
@@ -96,20 +95,25 @@ export function activeMap<S extends (...params: any) => any>({
       result.topic.get();
       return result.data;
     },
-    set(...params: P) {
-      return {
-        value: (value: R) => {
-          const key = hashQueryKey(params);
-          let entry = cache.get(key)!;
-          if (entry) {
-            entry.data = value;
-            entry.version += 1;
-            entry.topic?.notify();
-          } else {
-            cache.set(key, createCacheEntry(key, value));
-          }
-        },
-      };
+    set(value: R, ...params: P[]) {
+      const key = hashQueryKey(params);
+      let entry = cache.get(key)!;
+      if (entry) {
+        entry.data = value;
+        entry.version += 1;
+        entry.topic?.notify();
+      } else {
+        cache.set(key, createCacheEntry(key, value));
+      }
+    },
+    subscribe: (listener: () => void, ...params: P[]) => {
+      const key = hashQueryKey(params);
+      let entry = cache.get(key);
+      if (!entry) {
+        entry = createCacheEntry(key, initItem(...params));
+        cache.set(key, entry);
+      }
+      return entry.topic.subscribe(listener);
     },
     filter(predicate: (...params: P) => boolean): R[] {
       const result = [];

@@ -14,13 +14,10 @@ export interface State<R> {
 }
 
 export interface ActiveComputed<S extends (...args: any) => any> {
-  type: "active-computed";
   get: (...params: Parameters<S>) => ReturnType<S>;
   getAsync: (...params: Parameters<S>) => Promise<ReturnType<S>>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
-  subscribe: (...params: Parameters<S>) => {
-    with: (listener: () => void) => () => void;
-  };
+  subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
 export function activeComputed<S extends (...args: any) => any>(
@@ -30,22 +27,21 @@ export function activeComputed<S extends (...args: any) => any>(
   type P = Parameters<S>;
   type R = ReturnType<S>;
 
-  const items = activeMap({
+  const collection = activeMap({
     createItem: (...params: P) =>
       createComputedSingle<R>(() => selector(...(params as any))),
     gcTime,
   });
 
   const result: ActiveComputed<S> = {
-    type: "active-computed" as const,
     get(...params: P): R {
-      return items.getOrCreate(...params).get();
+      return collection.getOrCreate(...params).get();
     },
     async getAsync(...params: P): Promise<R> {
       while (true) {
         const wasRunningComputedPromise = isRunningComputedPromise.value;
         try {
-          const item = items.getOrCreate(...params);
+          const item = collection.getOrCreate(...params);
           isRunningComputedPromise.value = true;
           const result = item.get();
           isRunningComputedPromise.value = wasRunningComputedPromise;
@@ -64,7 +60,7 @@ export function activeComputed<S extends (...args: any) => any>(
       try {
         return {
           status: "success",
-          data: items.getOrCreate(...params).get(),
+          data: collection.getOrCreate(...params).get(),
         };
       } catch (error: any) {
         if (error instanceof Promise || typeof error?.then === "function") {
@@ -74,10 +70,15 @@ export function activeComputed<S extends (...args: any) => any>(
         }
       }
     },
-    subscribe(...params: P) {
-      return {
-        with: (listener: () => void) =>
-          items.getOrCreate(...params).subscribe(listener),
+    subscribe: (listener: () => void, ...params: P) => {
+      const unsubscribe1 = collection.subscribe(listener, ...params);
+      const unsubscribe2 = collection
+        .getOrCreate(...params)
+        .subscribe(listener);
+
+      return () => {
+        unsubscribe2();
+        unsubscribe1();
       };
     },
   };

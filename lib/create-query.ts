@@ -43,7 +43,6 @@ export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
 };
 
 export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
-  type: "active-query";
   get: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? A : never;
@@ -58,6 +57,7 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
     predicate?: ((...params: Parameters<S>) => boolean) | true,
     options?: { reset?: boolean }
   ) => Promise<void>;
+  subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
 export function activeQuery<S extends (...args: any) => Promise<any>>(
@@ -108,8 +108,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     gcTime: options.gcTime ?? Number.POSITIVE_INFINITY,
   });
 
-  const result = {
-    type: "active-query" as const,
+  const result: ActiveQuery<S> = {
     get(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
       // Start fetching data if it's not fetching yet. Errors are caught so that
@@ -144,6 +143,17 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
         promises.push(item.invalidate(options?.reset));
       }
       await Promise.all(promises);
+    },
+    subscribe(listener: () => void, ...params: Parameters<S>) {
+      const unsubscribe1 = collection.subscribe(listener, ...params);
+      const unsubscribe2 = collection
+        .getOrCreate(...params)
+        .subscribe(listener);
+
+      return () => {
+        unsubscribe2();
+        unsubscribe1();
+      };
     },
   };
 

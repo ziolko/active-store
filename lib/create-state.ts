@@ -1,7 +1,6 @@
 import { activeExternalState } from "./core";
 
 export interface ActiveState<V> {
-  type: "active-state";
   get: () => V;
   set: (value: V) => void;
   subscribe: (listener: (value: V) => any) => () => void;

@@ -39,9 +39,7 @@ describe("createQuery", () => {
     const query = activeQuery((id: number) => success(id));
 
     // Start a subscription
-    const unsubscribe = activeComputed(() => query.get(1))
-      .subscribe()
-      .with(() => null);
+    const unsubscribe = query.subscribe(() => null, 1);
 
     expect(query.state(1).status).toBe("pending");
     await jest.advanceTimersByTimeAsync(2000);

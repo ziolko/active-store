@@ -94,7 +94,7 @@ describe("createCollection", () => {
       topic.subscribe(onChange);
     }
 
-    collection.set(1).value({ id: -1 });
+    collection.set({ id: -1 }, 1);
 
     expect(onChange).toBeCalledTimes(1);
   });

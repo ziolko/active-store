@@ -2,7 +2,6 @@
 import { __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as reactInternals } from "react";
 
 export interface ActiveExternalState<R> {
-  type: "active-external-state";
   get: () => R;
   notify: () => void;
   subscribe: (listener: (dependency: Dependency) => any) => () => void;
@@ -26,7 +25,6 @@ export function activeExternalState<R = any>(
   let shouldCheckIdentity = true;
 
   const result: ActiveExternalState<R> = {
-    type: "active-external-state" as const,
     get() {
       if (
         reactInternals?.ReactCurrentOwner?.current &&
