@@ -1,6 +1,15 @@
 // @ts-ignore
 import { __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED as reactInternals } from "react";
 
+export interface Active<R> {
+  get: () => R;
+}
+
+export interface ActiveSubscribe<R> {
+  get: () => R;
+  subscribe: (listener: () => any) => () => void;
+}
+
 export interface ActiveExternalState<R> {
   get: () => R;
   notify: () => void;
