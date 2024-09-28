@@ -183,6 +183,15 @@ describe("createQuery", () => {
     expect(query.state(5).status).toBe("success");
   });
 
+  it("Immediatelly returns error for synchronous function", () => {
+    const query = activeQuery((id: number) => {
+      throw new Error("Test error");
+    });
+
+    expect(() => query.get(5)).toThrow("Test error");
+    expect(query.state(5).status).toBe("error");
+  });
+
   const success = <T>(data: T) =>
     new Promise<T>((resolve) => setTimeout(() => resolve(data), 500));
 
