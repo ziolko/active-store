@@ -36,15 +36,15 @@ function createActiveSelectorState() {
       subscriptionsCount += 1;
 
       return () => {
-        // Unsubscribe in the next tick so that we don't
-        // refetch data if data is resubscribed in the same render
+        // Unsubscribe a second later so that we don't
+        // refetch if data is resubscribed in a moment
         setTimeout(() => {
           subscriptionsCount -= 1;
           if (subscriptionsCount === 0) {
             dependencies?.unsubscribe();
             onUpdated = null;
           }
-        }, 0);
+        }, 1000);
       };
     },
     getSnapshot(selector: () => any) {
