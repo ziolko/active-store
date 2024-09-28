@@ -25,35 +25,33 @@ type InitialState<R> =
     }
   | { status: "error"; error: any; isStale: boolean };
 
-type RetryDelayFunction<S extends (...args: any) => Promise<any>> = (
-  retryAttempt: number,
-  error: any
-) => number | false | ((...params: Parameters<S>) => number | false);
-
-export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
+export type ActiveQueryOptions<S extends (...args: any) => any> = {
   gcTime?: number;
   initialState?: (
     ...params: Parameters<S>
-  ) => InitialState<ReturnType<S> extends Promise<infer A> ? A : never>;
-  retryDelay?: false | RetryDelayFunction<S>;
+  ) => InitialState<ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>>;
   onSubscribe?: (...params: Parameters<S>) => () => void;
 };
 
-export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
+export interface ActiveQuery<S extends (...args: any) => any> {
   get: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? A : never;
+  ) => ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>;
   getAsync: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? Promise<A> : never;
+  ) => ReturnType<S> extends Promise<infer A>
+    ? Promise<A>
+    : Promise<ReturnType<S>>;
   state: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
+  ) => ReturnType<S> extends Promise<infer A> ? State<A> : State<ReturnType<S>>;
   setState: (
-    state: InitialState<ReturnType<S> extends Promise<infer A> ? A : never>,
+    state: InitialState<
+      ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>
+    >,
     ...params: Parameters<S>
   ) => void;
-  invalidateOne: (...params: Parameters<S>) => ReturnType<S>;
+  invalidateOne: (...params: Parameters<S>) => Promise<void>;
   invalidate: (
     predicate?: ((...params: Parameters<S>) => boolean) | true,
     options?: { reset?: boolean }
@@ -61,50 +59,17 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
-export function activeQuery<S extends (...args: any) => Promise<any>>(
+export function activeQuery<S extends (...args: any) => any>(
   factory: S,
   options: ActiveQueryOptions<S> = {}
 ): ActiveQuery<S> {
   type P = Parameters<S>;
-  type R = ReturnType<S> extends Promise<infer A> ? A : never;
+  type R = ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>;
 
   const collection = activeMap({
     createItem: (...params: P) => {
       const initialState = options.initialState?.(...params) ?? {
         status: "pending",
-      };
-      const getRetryDelay = (attempt: number, error: any) => {
-        if (options.retryDelay === false) {
-          return false;
-        }
-        if (!options.retryDelay) {
-          return attempt < 3 ? attempt * 1000 : false;
-        }
-        const result = options.retryDelay(attempt, error);
-        return typeof result === "function" ? result(...params) : result;
-      };
-      const factoryWithRetry = (): Promise<R> => {
-        function run(attempt: number): Promise<R> {
-          let promise: Promise<R>;
-          const { value, error } = compute(() => factory(...(params as any)), {
-            trackDependencies: false,
-          });
-
-          promise = error ? (Promise.reject(error) as any) : value;
-
-          return promise.catch((error) => {
-            const retryDelay = getRetryDelay(attempt + 1, error);
-            if (retryDelay === false) {
-              throw error;
-            } else {
-              return new Promise((res) => setTimeout(res, retryDelay)).then(
-                () => run(attempt + 1)
-              );
-            }
-          });
-        }
-
-        return run(0);
       };
 
       function onSubscribe() {
@@ -115,7 +80,11 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
         }
       }
 
-      return createQuerySingle<R>(factoryWithRetry, initialState, onSubscribe);
+      return createQuerySingle<R>(
+        () => factory(...(params as any[])),
+        initialState,
+        onSubscribe
+      );
     },
     gcTime: options.gcTime ?? Number.POSITIVE_INFINITY,
   });
@@ -145,7 +114,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       collection.getOrCreate(...(params as any)).setState(state);
     },
     invalidateOne(...params: Parameters<S>) {
-      return collection.getOrCreate(...(params as any)).invalidate() as any;
+      return collection.getOrCreate(...(params as any)).invalidate();
     },
     async invalidate(
       predicate?: ((...params: Parameters<S>) => boolean) | true,
@@ -175,7 +144,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
 }
 
 function createQuerySingle<R>(
-  factory: () => Promise<R>,
+  factory: () => R | Promise<R>,
   initialState: InitialState<R>,
   onSubscribeParam: () => () => void
 ) {
@@ -223,56 +192,69 @@ function createQuerySingle<R>(
       isRefetching: !isInitialLoading,
     };
 
-    let value: Promise<R>;
-    try {
-      value = factory();
-    } catch (error) {
-      value = Promise.reject(error);
-    }
-    currentPromise = value;
+    const { value, error } = compute(factory, { trackDependencies: false });
+
+    currentPromise = null;
     currentPromiseForSuspense = null;
 
+    if (error) {
+      currentPromise = Promise.reject(error);
+      setError(error);
+      return currentPromise;
+    }
+
+    const isPromise =
+      value instanceof Promise || typeof (value as any)?.then === "function";
+
+    if (!value || !isPromise) {
+      currentPromise = Promise.resolve(value);
+      setSuccess(value);
+      return currentPromise;
+    }
+
+    currentPromise = value;
     state.notify();
 
+    //@ts-expect-error
     value.then(
-      (data: any) => {
-        if (value === currentPromise) {
-          currentState = {
-            status: "success",
-            fetchStatus: "idle",
-            isPending: false,
-            isFetching: false,
-            isRefetching: false,
-            isSuccess: true,
-            isError: false,
-            isStale: false,
-            data,
-            dataUpdatedAt: Date.now(),
-          };
-          state.notify();
-        }
-      },
-      (error: any) => {
-        if (value === currentPromise) {
-          currentState = {
-            status: "error",
-            fetchStatus: "idle",
-            isPending: false,
-            isFetching: false,
-            isRefetching: false,
-            isSuccess: false,
-            isError: true,
-            isStale: false,
-            error,
-            errorUpdatedAt: Date.now(),
-            data: currentState.data,
-            dataUpdatedAt: currentState.dataUpdatedAt,
-          };
-          state.notify();
-        }
-      }
+      (data: any) => value === currentPromise && setSuccess(data),
+      (error: any) => value === currentPromise && setError(error)
     );
     return value;
+  }
+
+  function setSuccess(data: any) {
+    currentState = {
+      status: "success",
+      fetchStatus: "idle",
+      isPending: false,
+      isFetching: false,
+      isRefetching: false,
+      isSuccess: true,
+      isError: false,
+      isStale: false,
+      data,
+      dataUpdatedAt: Date.now(),
+    };
+    state.notify();
+  }
+
+  function setError(error: any) {
+    currentState = {
+      status: "error",
+      fetchStatus: "idle",
+      isPending: false,
+      isFetching: false,
+      isRefetching: false,
+      isSuccess: false,
+      isError: true,
+      isStale: false,
+      error,
+      errorUpdatedAt: Date.now(),
+      data: currentState.data,
+      dataUpdatedAt: currentState.dataUpdatedAt,
+    };
+    state.notify();
   }
 
   async function invalidate(reset?: boolean) {

@@ -66,23 +66,11 @@ describe("createQuery", () => {
   });
 
   it("Returns hasError after fetch fails", async () => {
-    const query = activeQuery((id: number) => failure(id), {
-      retryDelay: false,
-    });
+    const query = activeQuery((id: number) => failure(id));
     query.getAsync(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isError).toBe(true);
     expect(() => query.get(1)).toThrow();
-  });
-
-  it("By default retries 2 times after initial fetch fails", async () => {
-    const factory = jest.fn((id: number) => failure(id));
-    const query = activeQuery(factory);
-    query.getAsync(1);
-    await jest.advanceTimersByTimeAsync(5000);
-    expect(query.state(1).isError).toBe(true);
-    expect(() => query.get(1)).toThrow();
-    expect(factory).toHaveBeenCalledTimes(3);
   });
 
   it("Returns provided initial data", async () => {
@@ -186,6 +174,13 @@ describe("createQuery", () => {
     const promise = query.getAsync(1);
     await jest.advanceTimersByTimeAsync(200);
     expect(promise).resolves.toEqual(1);
+  });
+
+  it("Immediatelly returns success for synchronous function", () => {
+    const query = activeQuery((id: number) => id * 100);
+
+    expect(query.get(5)).toEqual(500);
+    expect(query.state(5).status).toBe("success");
   });
 
   const success = <T>(data: T) =>
