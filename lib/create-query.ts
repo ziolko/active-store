@@ -25,30 +25,27 @@ type InitialState<R> =
     }
   | { status: "error"; error: any; isStale: boolean };
 
-export type ActiveQueryOptions<S extends (...args: any) => any> = {
+export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
   gcTime?: number;
+  retry?: number | false;
   initialState?: (
     ...params: Parameters<S>
-  ) => InitialState<ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>>;
+  ) => InitialState<ReturnType<S> extends Promise<infer A> ? A : never>;
   onSubscribe?: (...params: Parameters<S>) => () => void;
 };
 
-export interface ActiveQuery<S extends (...args: any) => any> {
+export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   get: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>;
+  ) => ReturnType<S> extends Promise<infer A> ? A : never;
   getAsync: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A>
-    ? Promise<A>
-    : Promise<ReturnType<S>>;
+  ) => ReturnType<S> extends Promise<infer A> ? Promise<A> : never;
   state: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? State<A> : State<ReturnType<S>>;
+  ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
   setState: (
-    state: InitialState<
-      ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>
-    >,
+    state: InitialState<ReturnType<S> extends Promise<infer A> ? A : never>,
     ...params: Parameters<S>
   ) => void;
   invalidateOne: (...params: Parameters<S>) => Promise<void>;
@@ -59,12 +56,12 @@ export interface ActiveQuery<S extends (...args: any) => any> {
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
-export function activeQuery<S extends (...args: any) => any>(
+export function activeQuery<S extends (...args: any) => Promise<any>>(
   factory: S,
   options: ActiveQueryOptions<S> = {}
 ): ActiveQuery<S> {
   type P = Parameters<S>;
-  type R = ReturnType<S> extends Promise<infer A> ? A : ReturnType<S>;
+  type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
   const collection = activeMap({
     createItem: (...params: P) => {
@@ -81,7 +78,10 @@ export function activeQuery<S extends (...args: any) => any>(
       }
 
       return createQuerySingle<R>(
-        () => factory(...(params as any[])),
+        withRetry(
+          () => factory(...(params as any[])),
+          (options.retry ?? 2) || 0
+        ),
         initialState,
         onSubscribe
       );
@@ -352,4 +352,28 @@ function getFullState<R>(initialState: InitialState<R>): State<R> {
     isRefetching: false,
     isStale: false,
   };
+}
+
+function withRetry<S extends () => Promise<any>>(
+  factory: S,
+  retryCount: number
+) {
+  function run(attempt: number): Promise<any> {
+    let promise = null;
+    try {
+      promise = Promise.resolve(factory());
+    } catch (error) {
+      promise = Promise.reject(error);
+    }
+    return promise.catch((error) => {
+      const retryDelay = attempt < retryCount ? (attempt + 1) * 1000 : 0;
+      if (!retryDelay) {
+        throw error;
+      } else {
+        const wait = new Promise((res) => setTimeout(res, retryDelay));
+        return wait.then(() => run(attempt + 1));
+      }
+    });
+  }
+  return () => run(0);
 }
