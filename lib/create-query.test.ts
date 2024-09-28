@@ -67,7 +67,7 @@ describe("createQuery", () => {
 
   it("Returns hasError after fetch fails", async () => {
     const query = activeQuery((id: number) => failure(id), {
-      retryDelay: () => false,
+      retryDelay: false,
     });
     query.getAsync(1);
     await jest.advanceTimersByTimeAsync(2000);

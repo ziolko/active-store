@@ -35,7 +35,7 @@ export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
   initialState?: (
     ...params: Parameters<S>
   ) => InitialState<ReturnType<S> extends Promise<infer A> ? A : never>;
-  retryDelay?: RetryDelayFunction<S>;
+  retryDelay?: false | RetryDelayFunction<S>;
 };
 
 export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
@@ -69,6 +69,9 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
         status: "pending",
       };
       const getRetryDelay = (attempt: number, error: any) => {
+        if (options.retryDelay === false) {
+          return false;
+        }
         if (!options.retryDelay) {
           return attempt < 3 ? attempt * 1000 : false;
         }
