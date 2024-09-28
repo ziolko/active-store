@@ -1,4 +1,4 @@
-import { activeExternalState, compute, isRunningComputedPromise } from "./core";
+import { activeExternalState, compute } from "./core";
 import { activeMap } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
@@ -39,15 +39,11 @@ export function activeComputed<S extends (...args: any) => any>(
     },
     async getAsync(...params: P): Promise<R> {
       while (true) {
-        const wasRunningComputedPromise = isRunningComputedPromise.value;
         try {
           const item = collection.getOrCreate(...params);
-          isRunningComputedPromise.value = true;
           const result = item.get();
-          isRunningComputedPromise.value = wasRunningComputedPromise;
           return result;
         } catch (error: any) {
-          isRunningComputedPromise.value = wasRunningComputedPromise;
           if (error instanceof Promise || typeof error?.then === "function") {
             await error;
           } else {

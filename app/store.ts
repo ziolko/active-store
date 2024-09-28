@@ -103,16 +103,16 @@ function activeLocalState<S extends ActiveQuery<any> | ActiveComputed<any>>(
       set(value: ReturnType<S["get"]>) {
         const currentId = (lastLocalValueId += 1);
 
-        localValueMap.set(...params).value({ value, id: lastLocalValueId });
+        localValueMap.set({ value, id: lastLocalValueId }, ...params);
 
         return function cancel() {
           if (localValueMap.getOrCreate(...params)?.id === currentId) {
-            localValueMap.set(...params).value(null);
+            localValueMap.set(null, ...params);
           }
         };
       },
       clear() {
-        localValueMap.set(...params).value(null);
+        localValueMap.set(null, ...params);
       },
     }),
   };

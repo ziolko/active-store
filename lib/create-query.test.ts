@@ -98,10 +98,9 @@ describe("createQuery", () => {
     const query = activeQuery((id: number) => success(id), {
       initialState: (id) => ({ status: "success", data: -id, isStale: true }),
     });
+    expect(query.get(1)).toBe(-1);
     expect(query.state(1).isSuccess).toBe(true);
     expect(query.state(1).isStale).toBe(true);
-    expect(query.state(1).isFetching).toBe(false);
-    expect(query.get(1)).toBe(-1);
     expect(query.state(1).isFetching).toBe(true);
   });
 
@@ -135,8 +134,8 @@ describe("createQuery", () => {
   });
 
   const success = <T>(data: T) =>
-    new Promise((resolve) => setTimeout(() => resolve(data), 500));
+    new Promise<T>((resolve) => setTimeout(() => resolve(data), 500));
 
   const failure = <T>(data: T) =>
-    new Promise((resolve, reject) => setTimeout(() => reject(data), 500));
+    new Promise<T>((resolve, reject) => setTimeout(() => reject(data), 500));
 });

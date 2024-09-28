@@ -1,8 +1,4 @@
-import {
-  activeExternalState,
-  isRunningComputedPromise,
-  isRunningReactSelector,
-} from "./core";
+import { activeExternalState } from "./core";
 import { activeMap } from "./create-collection";
 
 type State<R> = {
@@ -125,9 +121,8 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
-      if (isRunningReactSelector.value || isRunningComputedPromise.value) {
-        item.promiseForSuspense();
-      }
+      // Start fetching data if it's not fetching yets
+      item.promiseForSuspense();
       return item.get() as any;
     },
     invalidateOne(...params: Parameters<S>) {
