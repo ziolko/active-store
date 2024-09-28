@@ -32,11 +32,18 @@ function ErrorHandler(props: ActiveBoundaryErrorProps) {
 function App() {
   const optimistic = useActive(() => store.optimisticQuery.get("mateusz"));
   const breed = useActive(store.breedUpperCase);
+  const time = useActive(store.time.state);
 
   return (
     <div>
       <div>
         <div>{optimistic}</div>
+        <div>
+          TIME: {time.data ?? "Unknown"}
+          {time.error ? ` Error: ${time.error as unknown as string} ` : null}
+          {time.isStale && " (stale) "}
+          {time.isFetching && " (fetching) "}
+        </div>
         <input
           value={optimistic}
           onChange={(e) =>

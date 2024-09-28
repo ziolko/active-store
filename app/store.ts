@@ -13,6 +13,24 @@ function createTodoApp() {
   const newItem = activeState("");
   const items = activeState<ToDoItem[]>([]);
 
+  const time = activeQuery(
+    () => new Promise<number>((res) => setTimeout(() => res(Date.now()), 1000)),
+    {
+      onSubscribe() {
+        const interval = setInterval(
+          () =>
+            time.setState({
+              status: "error",
+              error: Date.now(),
+              isStale: true,
+            }),
+          5000
+        );
+        return () => clearInterval(interval);
+      },
+    }
+  );
+
   const addItem = () => {
     items.set([
       ...items.get(),
@@ -63,6 +81,7 @@ function createTodoApp() {
 
   return {
     newItem,
+    time,
     items,
     count,
     breedList,

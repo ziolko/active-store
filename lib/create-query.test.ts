@@ -133,6 +133,61 @@ describe("createQuery", () => {
     expect(firstPromise === secondPromise).toBeTruthy();
   });
 
+  it("Calls onSubscribe and unsubscribe callbacks", async () => {
+    const onUnsubscribe = jest.fn(() => null);
+    const onSubscribe = jest.fn(() => onUnsubscribe);
+
+    const query = activeQuery(
+      () => new Promise((res) => setTimeout(res, 100)),
+      { onSubscribe }
+    );
+
+    expect(onSubscribe).not.toBeCalled();
+    expect(onUnsubscribe).not.toBeCalled();
+
+    const unsubscribe1 = query.subscribe(() => () => null);
+    const unsubscribe2 = query.subscribe(() => () => null);
+
+    expect(onSubscribe).toBeCalledTimes(1);
+    expect(onUnsubscribe).not.toBeCalled();
+
+    unsubscribe1();
+
+    expect(onSubscribe).toBeCalledTimes(1);
+    expect(onUnsubscribe).not.toBeCalled();
+
+    unsubscribe2();
+
+    expect(onSubscribe).toBeCalledTimes(1);
+    expect(onUnsubscribe).toBeCalledTimes(1);
+  });
+
+  it("Returns data provided by setState", async () => {
+    const query = activeQuery((id: number) => success(id));
+    query.setState({ status: "success", data: 100, isStale: false }, 1);
+
+    expect(query.get(1)).toEqual(100);
+    expect(query.state(1).status).toEqual("success");
+    expect(query.state(1).isFetching).toEqual(false);
+
+    const promise = query.getAsync(1);
+    await jest.advanceTimersByTimeAsync(200);
+    expect(promise).resolves.toEqual(100);
+  });
+
+  it("After setState fetches data on 'get' if provided data is stale", async () => {
+    const query = activeQuery((id: number) => success(id));
+    query.setState({ status: "success", data: 100, isStale: true }, 1);
+
+    expect(query.get(1)).toEqual(100);
+    expect(query.state(1).status).toEqual("success");
+    expect(query.state(1).isFetching).toEqual(true);
+
+    const promise = query.getAsync(1);
+    await jest.advanceTimersByTimeAsync(200);
+    expect(promise).resolves.toEqual(1);
+  });
+
   const success = <T>(data: T) =>
     new Promise<T>((resolve) => setTimeout(() => resolve(data), 500));
 

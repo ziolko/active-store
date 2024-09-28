@@ -1,4 +1,4 @@
-import { activeExternalState } from "./core";
+import { activeExternalState, compute } from "./core";
 import { activeMap } from "./create-collection";
 
 type State<R> = {
@@ -36,6 +36,7 @@ export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
     ...params: Parameters<S>
   ) => InitialState<ReturnType<S> extends Promise<infer A> ? A : never>;
   retryDelay?: false | RetryDelayFunction<S>;
+  onSubscribe?: (...params: Parameters<S>) => () => void;
 };
 
 export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
@@ -48,6 +49,10 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
+  setState: (
+    state: InitialState<ReturnType<S> extends Promise<infer A> ? A : never>,
+    ...params: Parameters<S>
+  ) => void;
   invalidateOne: (...params: Parameters<S>) => ReturnType<S>;
   invalidate: (
     predicate?: ((...params: Parameters<S>) => boolean) | true,
@@ -81,12 +86,11 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       const factoryWithRetry = (): Promise<R> => {
         function run(attempt: number): Promise<R> {
           let promise: Promise<R>;
-          try {
-            promise = factory(...(params as any));
-          } catch (error) {
-            // if error is thrown synchronously, convert it to exception
-            promise = Promise.reject(error);
-          }
+          const { value, error } = compute(() => factory(...(params as any)), {
+            trackDependencies: false,
+          });
+
+          promise = error ? (Promise.reject(error) as any) : value;
 
           return promise.catch((error) => {
             const retryDelay = getRetryDelay(attempt + 1, error);
@@ -102,7 +106,16 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
 
         return run(0);
       };
-      return createQuerySingle<R>(factoryWithRetry, initialState);
+
+      function onSubscribe() {
+        if (typeof options.onSubscribe === "function") {
+          return options.onSubscribe(...params);
+        } else {
+          return () => null;
+        }
+      }
+
+      return createQuerySingle<R>(factoryWithRetry, initialState, onSubscribe);
     },
     gcTime: options.gcTime ?? Number.POSITIVE_INFINITY,
   });
@@ -127,6 +140,9 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       // Start fetching data if it's not fetching yets
       item.promiseForSuspense();
       return item.get() as any;
+    },
+    setState(state: InitialState<R>, ...params: Parameters<S>) {
+      collection.getOrCreate(...(params as any)).setState(state);
     },
     invalidateOne(...params: Parameters<S>) {
       return collection.getOrCreate(...(params as any)).invalidate() as any;
@@ -160,19 +176,21 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
 
 function createQuerySingle<R>(
   factory: () => Promise<R>,
-  initialState: InitialState<R>
+  initialState: InitialState<R>,
+  onSubscribeParam: () => () => void
 ) {
   let isSubscribed = false;
   let currentState = getFullState(initialState);
   let currentPromise: any = null;
   let currentPromiseForSuspense: any = null;
 
-  if (currentState.isSuccess && !currentState.isStale) {
+  if (currentState.isSuccess) {
     currentPromise = Promise.resolve(currentState.data);
   }
 
-  if (currentState.isError && !currentState.isStale) {
+  if (currentState.isError) {
     currentPromise = Promise.reject(currentState.error);
+    currentPromise.catch(() => null); // prevent "unhandled rejection" error
   }
 
   const state = activeExternalState(
@@ -180,15 +198,31 @@ function createQuerySingle<R>(
       return currentState;
     },
     function onSubscribe() {
-      setTimeout(() => (currentPromise ? null : fetch()), 0);
+      setTimeout(() => fetchIfNeedRefresh().catch(() => null), 0);
       isSubscribed = true;
+      const unsubscribe = onSubscribeParam();
       return () => {
         isSubscribed = false;
+        unsubscribe();
       };
     }
   );
 
-  function fetch() {
+  function fetchIfNeedRefresh() {
+    // Return cached promise if it's already fetching
+    if (currentPromise && (currentState.isFetching || !currentState.isStale)) {
+      return currentPromise;
+    }
+
+    const isInitialLoading = !currentState.isSuccess && !currentState.isError;
+    currentState = {
+      ...currentState,
+      isPending: isInitialLoading,
+      fetchStatus: "fetching",
+      isFetching: true,
+      isRefetching: !isInitialLoading,
+    };
+
     let value: Promise<R>;
     try {
       value = factory();
@@ -197,16 +231,6 @@ function createQuerySingle<R>(
     }
     currentPromise = value;
     currentPromiseForSuspense = null;
-
-    const isInitialLoading = !currentState.isSuccess && !currentState.isError;
-
-    currentState = {
-      ...currentState,
-      isPending: isInitialLoading,
-      fetchStatus: "fetching",
-      isFetching: true,
-      isRefetching: !isInitialLoading,
-    };
 
     state.notify();
 
@@ -258,20 +282,38 @@ function createQuerySingle<R>(
     currentPromise = null;
     currentPromiseForSuspense = null;
     if (isSubscribed) {
-      await fetch().catch(() => null);
+      await fetchIfNeedRefresh().catch(() => null);
     }
   }
 
-  const getPromise = () => currentPromise ?? fetch();
+  async function setState(newState: InitialState<R>) {
+    currentState = getFullState(newState);
+    currentPromise = null;
+    currentPromiseForSuspense = null;
+
+    if (currentState.isSuccess) {
+      currentPromise = Promise.resolve(currentState.data);
+    }
+
+    if (currentState.isError) {
+      currentPromise = Promise.reject(currentState.error);
+      currentPromise.catch(() => null); // prevent "unhandled rejection" error
+    }
+
+    if (isSubscribed) {
+      fetchIfNeedRefresh().catch(() => null);
+    }
+
+    state.notify();
+  }
 
   return {
     get: state.get,
     subscribe: state.subscribe,
-    fetch,
-    promise: getPromise,
+    promise: fetchIfNeedRefresh,
     promiseForSuspense: () => {
       if (!currentPromiseForSuspense) {
-        const promise = getPromise().catch(() => null);
+        const promise = fetchIfNeedRefresh().catch(() => null);
         currentPromiseForSuspense = Error(
           "Suspense Exception: This is not a real error! It's an implementation detail of `activeQuery` to interrupt the current render. You must rethrow it immediately. Capturing without rethrowing will lead to unexpected behavior.\n\nTo handle async errors, wrap your component in an ActiveBoundary."
         );
@@ -283,6 +325,7 @@ function createQuerySingle<R>(
       return currentPromiseForSuspense;
     },
     invalidate,
+    setState,
   };
 }
 
