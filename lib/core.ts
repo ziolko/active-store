@@ -118,3 +118,17 @@ export function compute<R>(
 }
 
 export let isRunningReactSelector = { value: false };
+
+export async function getActive<T>(fn: (() => T) | Active<T>): Promise<T> {
+  do {
+    try {
+      return typeof fn === "function" ? fn() : fn.get();
+    } catch (error: any) {
+      if (error instanceof Promise || typeof error?.then === "function") {
+        await error;
+      } else {
+        throw error;
+      }
+    }
+  } while (true);
+}

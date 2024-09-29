@@ -59,7 +59,7 @@ describe("createQuery", () => {
 
   it("Returns hasSuccess after fetch is done", async () => {
     const query = activeQuery((id: number) => success(id));
-    query.getAsync(1);
+    query.state(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isSuccess).toBe(true);
     expect(query.get(1)).toBe(1);
@@ -67,7 +67,7 @@ describe("createQuery", () => {
 
   it("Returns hasError after fetch fails", async () => {
     const query = activeQuery((id: number) => failure(id), { retry: false });
-    query.getAsync(1);
+    query.state(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isError).toBe(true);
     expect(() => query.get(1)).toThrow();
@@ -179,7 +179,7 @@ describe("createQuery", () => {
   it("Supports retrying after initial fetch fails", async () => {
     const factory = jest.fn((id: number) => failure(id));
     const query = activeQuery(factory);
-    query.getAsync(1);
+    query.state(1);
     await jest.advanceTimersByTimeAsync(5000);
     expect(query.state(1).isError).toBe(true);
     expect(() => query.get(1)).toThrow();

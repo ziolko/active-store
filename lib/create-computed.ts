@@ -15,7 +15,6 @@ export interface State<R> {
 
 export interface ActiveComputed<S extends (...args: any) => any> {
   get: (...params: Parameters<S>) => ReturnType<S>;
-  getAsync: (...params: Parameters<S>) => Promise<ReturnType<S>>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
@@ -36,21 +35,6 @@ export function activeComputed<S extends (...args: any) => any>(
   const result: ActiveComputed<S> = {
     get(...params: P): R {
       return collection.getOrCreate(...params).get();
-    },
-    async getAsync(...params: P): Promise<R> {
-      while (true) {
-        try {
-          const item = collection.getOrCreate(...params);
-          const result = item.get();
-          return result;
-        } catch (error: any) {
-          if (error instanceof Promise || typeof error?.then === "function") {
-            await error;
-          } else {
-            throw error;
-          }
-        }
-      }
     },
     state(...params: P): State<R> {
       try {

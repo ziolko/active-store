@@ -1,22 +1,22 @@
 import { ActiveExternalState, Dependency, activeExternalState } from "./core";
 
-export interface ActiveMapOptions<S extends (...params: any) => any> {
+export interface ActiveMapOptions<S extends (...params: any[]) => any> {
   createItem: S;
   gcTime?: number;
-  gcCallback?: (...params: Parameters<S>) => void;
+  onSubscribe?: (...params: Parameters<S>) => () => void;
 }
 
-export interface ActiveMap<S extends (...args: any) => any> {
+export interface ActiveMap<S extends (...args: any[]) => any> {
   getOrCreate: (...params: Parameters<S>) => ReturnType<S>;
   filter: (predicate: (...params: Parameters<S>) => boolean) => ReturnType<S>[];
   set: (value: ReturnType<S>, ...params: Parameters<S>) => void;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
-export function activeMap<S extends (...params: any) => any>({
+export function activeMap<S extends (...params: any[]) => any>({
   createItem: initItem,
   gcTime = Number.POSITIVE_INFINITY,
-  gcCallback,
+  onSubscribe,
 }: ActiveMapOptions<S>): ActiveMap<S> {
   type R = ReturnType<S>;
   type P = Parameters<S>;
@@ -28,7 +28,7 @@ export function activeMap<S extends (...params: any) => any>({
   };
   const cache = new Map<string, CacheEntry>();
 
-  function createCacheEntry(key: string, data: R) {
+  function createCacheEntry(key: string, data: R, params: P) {
     let isSubscribed = false;
     let timeoutHandler: number | undefined;
 
@@ -42,12 +42,14 @@ export function activeMap<S extends (...params: any) => any>({
           if (gcTime !== Number.POSITIVE_INFINITY) {
             stopTimer();
           }
+          const unsbuscribe = onSubscribe?.(...params);
 
           return () => {
             isSubscribed = false;
             if (gcTime !== Number.POSITIVE_INFINITY) {
               startTimer();
             }
+            unsbuscribe?.();
           };
         }
       ),
@@ -67,15 +69,8 @@ export function activeMap<S extends (...params: any) => any>({
 
     function onTimeout() {
       timeoutHandler = undefined;
-      if (!isSubscribed) {
-        gcCallback?.(...JSON.parse(key));
-      }
-
-      // Ensure that nobody subscribed in gcCallback
-      if (!isSubscribed) {
-        entry.version += 1;
-        cache.delete(key);
-      }
+      entry.version += 1;
+      cache.delete(key);
     }
 
     startTimer();
@@ -84,33 +79,34 @@ export function activeMap<S extends (...params: any) => any>({
   }
 
   return {
-    getOrCreate(...params: P[]): R {
+    getOrCreate(...params: P): R {
       const key = hashQueryKey(params);
       let result = cache.get(key)!;
       if (!result) {
-        result = createCacheEntry(key, initItem(...params));
+        result = createCacheEntry(key, initItem(...params), params);
         cache.set(key, result);
       }
 
       result.topic.get();
       return result.data;
     },
-    set(value: R, ...params: P[]) {
+    set(value: R, ...params: P) {
       const key = hashQueryKey(params);
       let entry = cache.get(key)!;
-      if (entry) {
+
+      if (!entry) {
+        cache.set(key, createCacheEntry(key, value, params));
+      } else if (!Object.is(entry.data, value)) {
         entry.data = value;
         entry.version += 1;
         entry.topic?.notify();
-      } else {
-        cache.set(key, createCacheEntry(key, value));
       }
     },
-    subscribe: (listener: () => void, ...params: P[]) => {
+    subscribe: (listener: () => void, ...params: P) => {
       const key = hashQueryKey(params);
       let entry = cache.get(key);
       if (!entry) {
-        entry = createCacheEntry(key, initItem(...params));
+        entry = createCacheEntry(key, initItem(...params), params);
         cache.set(key, entry);
       }
       return entry.topic.subscribe(listener);

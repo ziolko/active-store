@@ -1,23 +1,43 @@
 import { activeExternalState } from "./core";
+import { activeMap } from "./create-collection";
 
-export interface ActiveState<V> {
-  get: () => V;
-  set: (value: V) => void;
-  subscribe: (listener: (value: V) => any) => () => void;
+type ValueType<S> = S extends (...params: any) => infer V ? V : S;
+type ParamsType<S> = S extends (...params: infer P) => any
+  ? P
+  : Parameters<() => void>;
+
+export interface ActiveState<S extends (...params: any) => any> {
+  get: (...params: Parameters<S>) => ReturnType<S>;
+  set: (value: ReturnType<S>, ...params: Parameters<S>) => void;
+  subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
-export function activeState<V>(
+export function activeState<S>(
+  initialValue: S,
+  options: {
+    onSubscribe?: (...params: ParamsType<S>) => () => void;
+    gcTime?: S extends (...params: any) => any ? number : never;
+  } = {}
+): S extends (...params: any) => any ? ActiveState<S> : ActiveState<() => S> {
+  if (typeof initialValue === "function") {
+    type S2 = S extends (...params: any) => any ? S : never;
+    return activeComplexState(initialValue as S2, options) as any;
+  }
+
+  return activeSingleState(initialValue, options) as any;
+}
+
+function activeSingleState<V>(
   initialValue: V,
   options: {
-    onSubscribe?: (item: {
-      get: () => V;
-      set: (value: V) => void;
-    }) => () => void;
+    onSubscribe?: () => () => void;
   } = {}
-) {
-  let value = initialValue;
+): ActiveState<() => V> {
+  type S = () => V;
 
-  function setValue(newValue: V) {
+  let value = initialValue as ValueType<S>;
+
+  function setValue(newValue: ValueType<S>) {
     if (!Object.is(newValue, value)) {
       value = newValue;
       topic.notify();
@@ -28,18 +48,38 @@ export function activeState<V>(
     () => value,
     (): (() => void) => {
       if (options?.onSubscribe) {
-        return options?.onSubscribe({ get: topic.get, set: setValue });
+        return options?.onSubscribe();
       } else {
         return () => null;
       }
     }
   );
 
-  const result = {
+  const result: ActiveState<S> = {
     get: topic.get,
     set: setValue,
-    subscribe: (listener: (value: V) => void) =>
-      topic.subscribe(() => listener(topic.get())),
+    subscribe: (listener: () => void) => topic.subscribe(() => listener()),
   };
+
   return result;
+}
+
+function activeComplexState<S extends (...args: any) => any>(
+  factory: S,
+  options: {
+    onSubscribe?: (...params: Parameters<S>) => () => void;
+    gcTime?: number;
+  } = {}
+): ActiveState<S> {
+  const map = activeMap({
+    createItem: factory,
+    gcTime: options.gcTime,
+    onSubscribe: options.onSubscribe,
+  });
+
+  return {
+    get: map.getOrCreate,
+    set: map.set,
+    subscribe: map.subscribe,
+  };
 }

@@ -46,4 +46,67 @@ describe("createState", () => {
     expect(listener).toHaveBeenCalledTimes(0);
     expect(topic.get!()).toBe(version);
   });
+
+  it("Returns initial value for function initializer", () => {
+    const state = activeState((x: number) => x * 2);
+    expect(state.get(10)).toEqual(20);
+  });
+
+  it("Sets stored value for function initializer", () => {
+    const state = activeState((x: number) => x * 2);
+    state.set(100, 10);
+    expect(state.get(10)).toEqual(100);
+  });
+
+  it("Updates stored value for function initializer", () => {
+    const state = activeState((x: number) => x * 2);
+    expect(state.get(10)).toEqual(20);
+    state.set(100, 10);
+    expect(state.get(10)).toEqual(100);
+  });
+
+  it("Calls onSubscribe when subscribed for function initializer", () => {
+    const listener = jest.fn(() => null);
+    const onUnsubscribe = jest.fn(() => null);
+    const onSubscribe = jest.fn((x: number) => onUnsubscribe);
+    const state = activeState((x: number) => x * 2, {
+      onSubscribe,
+    });
+
+    const unsubscribe = state.subscribe(listener, 10);
+
+    expect(listener).toHaveBeenCalledTimes(0);
+    expect(onSubscribe).toHaveBeenCalledTimes(1);
+    expect(onUnsubscribe).toHaveBeenCalledTimes(0);
+
+    state.set(100, 10);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(onSubscribe).toHaveBeenCalledTimes(1);
+    expect(onUnsubscribe).toHaveBeenCalledTimes(0);
+
+    unsubscribe();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(onSubscribe).toHaveBeenCalledTimes(1);
+    expect(onUnsubscribe).toHaveBeenCalledTimes(1);
+
+    state.set(200, 10);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("Doesn't notify subscribers with function initializer when new and old values are equal", () => {
+    const state = activeState((id: number) => id * 2);
+    const onChange = jest.fn(() => null);
+    const unsubscribe = state.subscribe(onChange, 10);
+
+    state.set(20, 10);
+    expect(onChange).toHaveBeenCalledTimes(0);
+
+    state.set(30, 10);
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
 });

@@ -1,5 +1,6 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { activeExternalState, compute } from "./core";
+import { activeExternalState, compute, getActive } from "./core";
+import { activeQuery } from "./create-query";
 
 describe("createTopic", () => {
   it("Calls subscribed function", () => {
@@ -72,5 +73,30 @@ describe("compute", () => {
     }
 
     expect(compute(selector).error).not.toBeFalsy();
+  });
+});
+
+describe("getActive", () => {
+  jest.useFakeTimers();
+
+  it("Returns async result", async () => {
+    const query = activeQuery(
+      () => new Promise((res) => setTimeout(() => res("test"), 1000))
+    );
+
+    const promise = getActive(query);
+    await jest.advanceTimersByTimeAsync(1500);
+    await expect(promise).resolves.toEqual("test");
+  });
+
+  it("Throws async exception", async () => {
+    const query = activeQuery(
+      () =>
+        new Promise((res, reject) => setTimeout(() => reject("test"), 1000)),
+      { retry: false }
+    );
+
+    expect(getActive(query)).rejects.toBe("test");
+    await jest.advanceTimersByTimeAsync(1500);
   });
 });

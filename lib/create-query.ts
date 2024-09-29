@@ -94,7 +94,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       const item = collection.getOrCreate(...(params as any));
       // Start fetching data if it's not fetching yet. Errors are caught so that
       // React suspense always re-renders the components instead of showing an error
-      const promise = item.promiseForSuspense();
+      const promise = item.promiseForSuspense(params);
       const result = item.get();
 
       if (result.isSuccess) return result.data!;
@@ -107,7 +107,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
       // Start fetching data if it's not fetching yets
-      item.promiseForSuspense();
+      item.promiseForSuspense(params);
       return item.get() as any;
     },
     setState(state: InitialState<R>, ...params: Parameters<S>) {
@@ -293,11 +293,16 @@ function createQuerySingle<R>(
     get: state.get,
     subscribe: state.subscribe,
     promise: fetchIfNeedRefresh,
-    promiseForSuspense: () => {
+    promiseForSuspense: (params: any[]) => {
       if (!currentPromiseForSuspense) {
-        const promise = fetchIfNeedRefresh().catch(() => null);
+        const promise = fetchIfNeedRefresh().then(
+          () => null,
+          () => null
+        );
         currentPromiseForSuspense = Error(
-          "Suspense Exception: This is not a real error! It's an implementation detail of `activeQuery` to interrupt the current render. You must rethrow it immediately. Capturing without rethrowing will lead to unexpected behavior.\n\nTo handle async errors, wrap your component in an ActiveBoundary."
+          `activeQuery is still fetching data for params: (${params.join(
+            ", "
+          )}). If you've got this error in React component or 'activeComputed' you must rethrow it immediately. Otherwise use 'getActive' to wait for the requested value.`
         );
         currentPromiseForSuspense.then = Promise.prototype.then.bind(promise);
         currentPromiseForSuspense.catch = Promise.prototype.catch.bind(promise);
@@ -366,6 +371,12 @@ function withRetry<S extends () => Promise<any>>(
       promise = Promise.reject(error);
     }
     return promise.catch((error) => {
+      // Don't retry when suspense error - it should surface immediatelly
+      // to get developer's attention
+      if (error instanceof Promise || typeof error?.then === "function") {
+        throw error;
+      }
+
       const retryDelay = attempt < retryCount ? (attempt + 1) * 1000 : 0;
       if (!retryDelay) {
         throw error;
