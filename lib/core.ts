@@ -10,13 +10,13 @@ export interface ActiveSubscribe<R> {
   subscribe: (listener: () => any) => () => void;
 }
 
-export interface ActiveExternalState<R> {
+export interface ActiveCore<R> {
   get: () => R;
   notify: () => void;
   subscribe: (listener: (dependency: Dependency) => any) => () => void;
 }
 
-export function activeExternalState<R = any>(
+export function activeTopic<R = any>(
   get: () => R,
   onSubscribe: (notify: () => void) => () => void
 ) {
@@ -33,7 +33,7 @@ export function activeExternalState<R = any>(
 
   let shouldCheckIdentity = true;
 
-  const result: ActiveExternalState<R> = {
+  const result: ActiveCore<R> = {
     get() {
       if (
         reactInternals?.ReactCurrentOwner?.current &&

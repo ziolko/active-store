@@ -1,4 +1,4 @@
-import { activeExternalState, compute } from "./core";
+import { activeTopic, compute } from "./core";
 import { activeMap } from "./create-collection";
 
 type State<R> = {
@@ -162,7 +162,7 @@ function createQuerySingle<R>(
     currentPromise.catch(() => null); // prevent "unhandled rejection" error
   }
 
-  const state = activeExternalState(
+  const state = activeTopic(
     function get() {
       return currentState;
     },

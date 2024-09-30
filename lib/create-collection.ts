@@ -1,4 +1,4 @@
-import { ActiveExternalState, Dependency, activeExternalState } from "./core";
+import { ActiveCore, Dependency, activeTopic } from "./core";
 
 export interface ActiveMapOptions<S extends (...params: any[]) => any> {
   createItem: S;
@@ -24,7 +24,7 @@ export function activeMap<S extends (...params: any[]) => any>({
   type CacheEntry = {
     data: R;
     version: number;
-    topic: ActiveExternalState<number>;
+    topic: ActiveCore<number>;
   };
   const cache = new Map<string, CacheEntry>();
 
@@ -35,7 +35,7 @@ export function activeMap<S extends (...params: any[]) => any>({
     const entry: CacheEntry = {
       data,
       version: 0,
-      topic: activeExternalState(
+      topic: activeTopic(
         () => entry.version,
         () => {
           isSubscribed = true;

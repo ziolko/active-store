@@ -1,7 +1,7 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { activeState } from "./create-state";
 import { activeComputed } from "./create-computed";
-import { activeExternalState, compute, getActive } from "./core";
+import { activeTopic, compute, getActive } from "./core";
 import { activeQuery } from "./create-query";
 
 describe("createComputed", () => {
@@ -172,10 +172,7 @@ function createTestContext() {
   const onNestedDependencySubscribed = jest.fn(
     () => onNestedDependencyUnsubscribed
   );
-  const nestedDependency = activeExternalState(
-    () => 0,
-    onNestedDependencySubscribed
-  );
+  const nestedDependency = activeTopic(() => 0, onNestedDependencySubscribed);
   const computed = activeComputed(() => {
     nestedDependency.get();
     return { text: `${hello.get()} ${world.get()}` };

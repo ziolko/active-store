@@ -1,4 +1,4 @@
-import { activeExternalState } from "./core";
+import { activeTopic } from "./core";
 import { activeMap } from "./create-collection";
 
 type ValueType<S> = S extends (...params: any) => infer V ? V : S;
@@ -18,7 +18,9 @@ export function activeState<S>(
     onSubscribe?: (...params: ParamsType<S>) => () => void;
     gcTime?: S extends (...params: any) => any ? number : never;
   } = {}
-): S extends (...params: any) => any ? ActiveState<S> : ActiveState<() => S> {
+): [S] extends [(...params: any) => any]
+  ? ActiveState<S>
+  : ActiveState<() => S> {
   if (typeof initialValue === "function") {
     type S2 = S extends (...params: any) => any ? S : never;
     return activeComplexState(initialValue as S2, options) as any;
@@ -44,7 +46,7 @@ function activeSingleState<V>(
     }
   }
 
-  const topic = activeExternalState(
+  const topic = activeTopic(
     () => value,
     (): (() => void) => {
       if (options?.onSubscribe) {

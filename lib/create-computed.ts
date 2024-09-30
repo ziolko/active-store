@@ -1,4 +1,4 @@
-import { activeExternalState, compute } from "./core";
+import { activeTopic, compute } from "./core";
 import { activeMap } from "./create-collection";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
 
@@ -80,7 +80,7 @@ function createComputedSingle<R>(selector: () => R) {
     state.notifyAboutChanges?.();
   });
 
-  const topic = activeExternalState(
+  const topic = activeTopic(
     function get() {
       if (state.isSubscribed && !state.hasAnyDependencyChanged) {
         if (state.error) {

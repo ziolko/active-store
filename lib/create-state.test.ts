@@ -21,7 +21,7 @@ describe("createState", () => {
   });
 
   it("Notifies registered subscriber and update version when value changed", () => {
-    const state = activeState("test-value");
+    const state = activeState("test-value" as string | number);
     const { dependencies: topics } = compute(() => state.get());
     const topic: Dependency = topics.values().next().value;
 
@@ -97,7 +97,7 @@ describe("createState", () => {
   });
 
   it("Doesn't notify subscribers with function initializer when new and old values are equal", () => {
-    const state = activeState((id: number) => id * 2);
+    const state = activeState((id: number) => (id * 2) as string | number);
     const onChange = jest.fn(() => null);
     const unsubscribe = state.subscribe(onChange, 10);
 
