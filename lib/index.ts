@@ -2,7 +2,6 @@
 export { activeState } from "./create-state";
 export { activeQuery } from "./create-query";
 export { activeComputed } from "./create-computed";
-export { activeExternalState } from "./create-external-state";
 export { getActive } from "./core";
 export { useActive, ActiveBoundary } from "./react";
 
@@ -13,4 +12,3 @@ export type { ActiveQuery } from "./create-query";
 export type { ActiveComputed } from "./create-computed";
 export type { Active, ActiveSubscribe } from "./core";
 export type { ActiveBoundaryProps, ActiveBoundaryErrorProps } from "./react";
-export type { ActiveExternalState } from "./create-external-state";

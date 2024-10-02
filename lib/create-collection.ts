@@ -1,4 +1,4 @@
-import { ActiveCore, Dependency, activeTopic } from "./core";
+import { ActiveCore, activeTopic } from "./core";
 
 export interface ActiveMapOptions<S extends (...params: any[]) => any> {
   createItem: S;
