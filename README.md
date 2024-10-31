@@ -146,7 +146,15 @@ function GithubProfile() {
 The simplest building block of the app state. It's like the `useState` hook.
 
 ```typescript
-const state = activeState<T>(initialState: T);
+const state = activeState<T>(initialState: T, options?: { 
+  // onSubscribe is called when first subscriber subscribes to the state. 
+  // The callback returned from onSubscribe is called when last subscriber unsubscribes
+  onSubscribe?: () => () => void;
+  // Number of miliseconds the data will be cached after 
+  // last subscriber unsubscribes (defaults to infinity)
+  gcTime?: number;
+});
+
 
 // Returns the current value of the state
 state.get();
@@ -158,7 +166,23 @@ state.set(newValue: T);
 
 // Manually subscribes to changes in the state.
 // Takes a listener as a parameter. Returns unsubscribe function.
-state.subscribe(listener: (dependency: Dependency) => any) => () => void;
+state.subscribe(listener: () => any) => () => void;
+```
+
+Alternatively, you can provide a factory function as an `initialState`:
+```typescript
+const greetings = activeState((name: string) => `Hello ${name}`, {
+  onSubscribe(name: string) {
+    console.log(`Subscribed to ${name}`);
+    return () => { console.log(`Unsubscribed from ${name}`); }
+  },
+});
+
+console.log(greetings.get('Adam')); // will print "Hello Adam"
+
+// Set greetings for "Adam" to "Hi Adam"
+// Notice that the value comes first, and key comes after it
+greetings.set('Hi Adam', 'Adam');
 ```
 
 ### activeQuery
@@ -171,7 +195,18 @@ This is heavily based on React Query, so if you are familiar with this library y
 // Important: The query re-fetches based only on the provided parameters.
 // If you use e.g. activeState in the factory function, updating it's state
 // won't trigger a re-fetch.
-const query = activeQuery(factory: (...args: P) => Promise<R>);
+const query = activeQuery(factory: (...args: P) => Promise<R>, options?: { 
+  // Number of retries in case of failure
+  retry?: number | false;
+  // onSubscribe is called when first subscriber subscribes to the state. 
+  // The callback returned from onSubscribe is called when last subscriber unsubscribes
+  onSubscribe?: (...args: P) => () => void;
+  // Number of miliseconds the data will be cached after 
+  // last subscriber unsubscribes (defaults to infinity)
+  gcTime?: number;
+});
+
+
 
 // If the query for "hello" "world" has already resolved, returns the value.
 // If it rejected it throws the rejection reason as an exception
@@ -226,7 +261,11 @@ recomputes automatically whenever any of its dependency changes.
 // (or return a Promise) - TypeScript will complain when this happens.
 // You can use any combination of activeState, activeQuery, or
 // activeComputed inside.
-const computed = activeComputed(factory: (...args: P) => R);
+const computed = activeComputed(factory: (...args: P) => R, options?: { 
+  // Number of miliseconds the data will be cached after 
+  // last subscriber unsubscribes (defaults to infinity)
+  gcTime?: number;
+});
 
 // As active computed can depend on active query, it has to
 // follow its async semantics:
@@ -269,6 +308,21 @@ const value = useActive(store.currentUser.get);
 const value = useActive(store.currentUser);
 ```
 
+### getActive
+
+Compute value of an expression. If any active query or active computed is pending,
+it will wait until it fully resolves
+
+```typescript
+const query = activeQuery(
+  () => new Promise((res) => setTimeout(() => res("Hello"), 1000))
+);
+
+// Will await 1s until query resolves. 
+// Returned value will be equal "Hello World"
+const value = await getActive(() => `${query.get()} World` ); 
+```
+
 ### ActiveBoundary
 
 Active boundary wraps a section of the app that loads and fails together.
@@ -290,63 +344,6 @@ exception is _also_ a Promise.
 
 When the promise resolves, React re-renders the component so `activeComputed` recomputes the value and this time
 the query is already resolved so it successfully computes the value.
-
-## Low level primitives
-
-### activeExternalState
-
-This is the basic primitive of the libray, i.e. every other function
-described here uses `activeExternalState` under the hood.
-
-Ideally, this should be used only by libraries providing higher level primitives.
-
-```typescript
-const state = activeExternalState(
-  // the "get" method should return the current value of some external state
-  get() {
-    return _current_value_of_some_external_state_;
-  };
-  // the onSubscribe method is called when first React component subscribes
-  // to the active value either directly or through activeComputed
-  onSubscribe(notify) {
-    // Here is the code to start observing some value.
-    // This might be e.g. current network state, firebase object value, screen width etc.
-
-
-    // Return a function that is called when last React component unsubscribes
-    // from this active value. This is the place to do a cleanup
-    return () => console.log("unsubscribed");
-  }
-)
-```
-
-For example, `activeState` is defined as follows:
-
-```typescript
-export function activeState<V>(initialValue: V) {
-  let value = initialValue;
-  const topic = activeExternalState(
-    () => value,
-    () => () => null
-  );
-  const result = {
-    get: topic.get,
-    set(newValue: V) {
-      if (!Object.is(newValue, value)) {
-        value = newValue;
-        topic.notify();
-      }
-    },
-    subscribe: topic.subscribe,
-  };
-  return result;
-}
-```
-
-### activeMap
-
-Keeps a reactive collection of items. This is used in e.g. `activeQuery`
-and `activeComputed` to create a separate reactive object for each set of parameters.
 
 ## License
 

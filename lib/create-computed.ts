@@ -4,7 +4,6 @@ import { createDependenciesTracker } from "./create-dependencies-tracker";
 
 export interface ActiveComputedOptions {
   gcTime?: number;
-  enabled?: boolean;
 }
 
 export interface State<R> {
