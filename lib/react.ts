@@ -1,5 +1,8 @@
-import React, { useSyncExternalStore, useState } from "react";
+import React, { useState } from "react";
 import shallowequal from "shallowequal";
+
+//@ts-ignore
+import { useSyncExternalStore } from 'use-sync-external-store/shim';
 
 import { compute, isRunningReactSelector } from "./core";
 import { createDependenciesTracker } from "./create-dependencies-tracker";
