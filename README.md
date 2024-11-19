@@ -38,7 +38,7 @@ function activeAppStore() {
   // for activeQuery to resolve
   const profile = activeComputed(() => {
     // get currently selected github login. You will see a lot of `.get()`
-    // in the databases using active-store
+    // in the codebase using active-store
     const login = userLogin.get();
 
     // start fetching data from activeQuery for currently
@@ -234,6 +234,9 @@ query.state("hello", "world");
 // Returns a promise for query for given parameters
 query.getAsync("hello" ,"world");
 
+// Prefetch data - use it if you're sure that the data will be needed soon
+query.prefetch("hello", "world") ;
+
 // Invalidate query for given parameters - will mark data as stale
 // and refetch if any component uses the query (either directly, or
 // through activeComputed)
@@ -288,6 +291,9 @@ computed.getAsync("hello", "world");
 // - data?
 // - error?
 computed.state("hello", "world");
+
+// Prefetch data - use it if you're sure that the data will be needed soon
+computed.prefetch("hello", "world");
 ```
 
 ### useActive

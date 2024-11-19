@@ -15,6 +15,7 @@ export interface State<R> {
 export interface ActiveComputed<S extends (...args: any) => any> {
   get: (...params: Parameters<S>) => ReturnType<S>;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
+  prefetch: (...params: Parameters<S>) => State<ReturnType<S>>;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
@@ -31,24 +32,27 @@ export function activeComputed<S extends (...args: any) => any>(
     gcTime,
   });
 
+  function state(...params: P): State<R> {
+    try {
+      return {
+        status: "success",
+        data: collection.getOrCreate(...params).get(),
+      };
+    } catch (error: any) {
+      if (error instanceof Promise || typeof error?.then === "function") {
+        return { status: "pending" };
+      } else {
+        return { error, status: "error" };
+      }
+    }
+  }
+
   const result: ActiveComputed<S> = {
     get(...params: P): R {
       return collection.getOrCreate(...params).get();
     },
-    state(...params: P): State<R> {
-      try {
-        return {
-          status: "success",
-          data: collection.getOrCreate(...params).get(),
-        };
-      } catch (error: any) {
-        if (error instanceof Promise || typeof error?.then === "function") {
-          return { status: "pending" };
-        } else {
-          return { error, status: "error" };
-        }
-      }
-    },
+    state,
+    prefetch: state,
     subscribe: (listener: () => void, ...params: P) => {
       const unsubscribe1 = collection.subscribe(listener, ...params);
       const unsubscribe2 = collection

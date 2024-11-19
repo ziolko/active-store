@@ -41,6 +41,9 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   getAsync: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? Promise<A> : never;
+  prefetch: (
+    ...params: Parameters<S>
+  ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
@@ -103,6 +106,12 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     },
     getAsync(...params: Parameters<S>) {
       return collection.getOrCreate(...(params as any)).promise();
+    },
+    prefetch(...params: Parameters<S>) {
+      const item = collection.getOrCreate(...(params as any));
+      // Start fetching data if it's not fetching yets
+      item.promiseForSuspense(params);
+      return item.get() as any;
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
