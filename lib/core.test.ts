@@ -51,7 +51,7 @@ describe("compute", () => {
     );
     const { dependencies } = compute(() => state.get());
     expect(dependencies.size).toEqual(1);
-    expect(dependencies.values().next().value.get()).toEqual(1);
+    expect(dependencies.values().next().value!.get()).toEqual(1);
   });
 
   it("Registers the same dependency once even if registered multiple times", () => {

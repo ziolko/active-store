@@ -1,6 +1,6 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { activeQuery } from "./create-query";
-import { activeComputed } from "./create-computed";
+import { ActiveComputed, activeComputed } from "./create-computed";
 
 describe("createQuery", () => {
   jest.useFakeTimers();

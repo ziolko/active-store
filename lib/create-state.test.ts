@@ -23,7 +23,7 @@ describe("createState", () => {
   it("Notifies registered subscriber and update version when value changed", () => {
     const state = activeState("test-value" as string | number);
     const { dependencies: topics } = compute(() => state.get());
-    const topic: Dependency = topics.values().next().value;
+    const topic: Dependency = topics.values().next().value!;
 
     const listener = jest.fn();
     const version = topic.get!();
@@ -36,7 +36,7 @@ describe("createState", () => {
   it("Doesn't notify subscribers if new and old values are equal", () => {
     const state = activeState("test-value");
     const { dependencies: topics } = compute(() => state.get());
-    const topic: Dependency = topics.values().next().value;
+    const topic: Dependency = topics.values().next().value!;
 
     const listener = jest.fn();
     topic.subscribe(listener);

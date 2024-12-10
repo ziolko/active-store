@@ -183,7 +183,7 @@ function createTestContext() {
   expect(topics.size).toEqual(2);
   const iterator = topics.values();
   iterator.next(); // skip the activeMap topic
-  const topic = iterator.next().value;
+  const topic = iterator.next().value!;
 
   return {
     hello,
