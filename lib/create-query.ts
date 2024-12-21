@@ -25,7 +25,7 @@ type InitialState<R> =
     }
   | { status: "error"; error: any; isStale: boolean };
 
-export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
+export type ActiveAsyncOptions<S extends (...args: any) => Promise<any>> = {
   gcTime?: number;
   retry?: number | false;
   initialState?: (
@@ -34,11 +34,15 @@ export type ActiveQueryOptions<S extends (...args: any) => Promise<any>> = {
   onSubscribe?: (...params: Parameters<S>) => () => void;
 };
 
-export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
+export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   get: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? A : never;
-  getAsync: (
+  set: (
+    value: ReturnType<S> extends Promise<infer A> ? A : never,
+    ...params: Parameters<S>
+  ) => void;
+  getPromise: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? Promise<A> : never;
   prefetch: (
@@ -59,10 +63,10 @@ export interface ActiveQuery<S extends (...args: any) => Promise<any>> {
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
-export function activeQuery<S extends (...args: any) => Promise<any>>(
+export function activeAsync<S extends (...args: any) => Promise<any>>(
   factory: S,
-  options: ActiveQueryOptions<S> = {}
-): ActiveQuery<S> {
+  options: ActiveAsyncOptions<S> = {}
+): ActiveAsync<S> {
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
 
@@ -92,7 +96,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     gcTime: options.gcTime ?? Number.POSITIVE_INFINITY,
   });
 
-  const result: ActiveQuery<S> = {
+  const result: ActiveAsync<S> = {
     get(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
       // Start fetching data if it's not fetching yet. Errors are caught so that
@@ -104,7 +108,7 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
       else if (result.isError) throw result.error!;
       else throw promise;
     },
-    getAsync(...params: Parameters<S>) {
+    getPromise(...params: Parameters<S>) {
       return collection.getOrCreate(...(params as any)).promise();
     },
     prefetch(...params: Parameters<S>) {
@@ -121,6 +125,9 @@ export function activeQuery<S extends (...args: any) => Promise<any>>(
     },
     setState(state: InitialState<R>, ...params: Parameters<S>) {
       collection.getOrCreate(...(params as any)).setState(state);
+    },
+    set(value: R, ...params: Parameters<S>) {
+      collection.getOrCreate(...(params as any)).setState({ status: 'success', data: value, isStale: false });
     },
     invalidateOne(...params: Parameters<S>) {
       return collection.getOrCreate(...(params as any)).invalidate();

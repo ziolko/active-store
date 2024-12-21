@@ -6,7 +6,7 @@ To get started install the npm package with `npm i active-store`. You can then c
 
 ```typescript
 import { createContext, useContext } from "react";
-import { activeState, activeQuery, activeComputed } from "active-store";
+import { activeState, activeAsync, activeComputed } from "active-store";
 
 function activeAppStore() {
   // activeState is the simplest building block of active store.
@@ -16,10 +16,10 @@ function activeAppStore() {
   // - userLogin.set("new-value") to change the value stored in states
   const userLogin = activeState("ziolko");
 
-  // activeQuery is like useQuery in react-query - it fetches data
+  // activeAsync is similar to useQuery in react-query - it fetches data
   // for every unique set of arguments. In the case below there's only
   // one argument called - login.
-  const githubProfile = activeQuery(
+  const githubProfile = activeAsync(
     (
       login: string
     ): Promise<{
@@ -34,14 +34,14 @@ function activeAppStore() {
   );
 
   // activeComputed allows to get a computed value based on
-  // activeState and activeQuery. It uses React Suspense api to wait
-  // for activeQuery to resolve
+  // activeState and activeAsync. It uses React Suspense api to wait
+  // for activeAsync to resolve
   const profile = activeComputed(() => {
     // get currently selected github login. You will see a lot of `.get()`
     // in the codebase using active-store
     const login = userLogin.get();
 
-    // start fetching data from activeQuery for currently
+    // start fetching data from activeAsync for currently
     // selected github login. The line below will suspend until
     // github profile finishes loading.
     // There's no need for special handling of the async loading state.
@@ -185,17 +185,17 @@ console.log(greetings.get('Adam')); // will print "Hello Adam"
 greetings.set('Hi Adam', 'Adam');
 ```
 
-### activeQuery
+### activeAsync
 
 This is heavily based on React Query, so if you are familiar with this library you will feel like home.
 
 ```typescript
-// Create a query with a factor function returning promise.
+// Create an async state with a factor function returning promise.
 // Example: https://stackblitz.com/edit/vitejs-vite-mosens?file=src%2Fstore.ts
-// Important: The query re-fetches based only on the provided parameters.
+// Important: The async state re-fetches based only on the provided parameters.
 // If you use e.g. activeState in the factory function, updating it's state
 // won't trigger a re-fetch.
-const query = activeQuery(factory: (...args: P) => Promise<R>, options?: { 
+const query = activeAsync(factory: (...args: P) => Promise<R>, options?: { 
   // Number of retries in case of failure
   retry?: number | false;
   // onSubscribe is called when first subscriber subscribes to the state. 
@@ -205,7 +205,6 @@ const query = activeQuery(factory: (...args: P) => Promise<R>, options?: {
   // last subscriber unsubscribes (defaults to infinity)
   gcTime?: number;
 });
-
 
 
 // If the query for "hello" "world" has already resolved, returns the value.
@@ -231,8 +230,11 @@ query.get("hello", "world");
 // - fetchStatus: "fetching" | "paused" | "idle";
 query.state("hello", "world");
 
+// Sets new value for the async state.
+state.set(newValue: T);
+
 // Returns a promise for query for given parameters
-query.getAsync("hello" ,"world");
+query.getPromise("hello" ,"world");
 
 // Prefetch data - use it if you're sure that the data will be needed soon
 query.prefetch("hello", "world") ;
@@ -262,7 +264,7 @@ recomputes automatically whenever any of its dependency changes.
 ```typescript
 // The provided factory function must not be async
 // (or return a Promise) - TypeScript will complain when this happens.
-// You can use any combination of activeState, activeQuery, or
+// You can use any combination of activeState, activeAsync, or
 // activeComputed inside.
 const computed = activeComputed(factory: (...args: P) => R, options?: { 
   // Number of miliseconds the data will be cached after 
@@ -280,10 +282,6 @@ const computed = activeComputed(factory: (...args: P) => R, options?: {
 //   suspends rendering React components and activeComputed
 //   that depend on it (more on this below).
 computed.get("hello", "world");
-
-// Returns a promise for computed for given parameters
-computed.getAsync("hello", "world");
-
 
 // Returns the current state of the computed value.
 // The returned state has the following fields:
@@ -320,7 +318,7 @@ Compute value of an expression. If any active query or active computed is pendin
 it will wait until it fully resolves
 
 ```typescript
-const query = activeQuery(
+const query = activeAsync(
   () => new Promise((res) => setTimeout(() => res("Hello"), 1000))
 );
 
@@ -339,7 +337,7 @@ It's basically `<Suspense>` and React error boundary in a single component.
 
 You can find an example of using it in the "Quick start" section.
 
-## How does suspending activeQuery and activeComputed work
+## How does suspending activeAsync and activeComputed work
 
 This library uses the [React Suspense API](https://react.dev/reference/react/Suspense) for handling loading state.
 Under the hood it (ab)uses exceptions.

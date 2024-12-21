@@ -1,6 +1,6 @@
 {
   "name": "active-store",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "",
   "scripts": {
     "test": "jest",

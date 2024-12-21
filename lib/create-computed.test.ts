@@ -2,7 +2,7 @@ import { expect, describe, it, jest } from "@jest/globals";
 import { activeState } from "./create-state";
 import { activeComputed } from "./create-computed";
 import { activeTopic, compute, getActive } from "./core";
-import { activeQuery } from "./create-query";
+import { activeAsync } from "./create-query";
 
 describe("createComputed", () => {
   jest.useFakeTimers();
@@ -94,7 +94,7 @@ describe("createComputed", () => {
   });
 
   it("computed.promise waits until query resolves", async () => {
-    const query = activeQuery(
+    const query = activeAsync(
       () =>
         new Promise((resolve) => setTimeout(() => resolve("Hello world"), 2000))
     );
@@ -112,8 +112,8 @@ describe("createComputed", () => {
       () => new Promise((res) => setTimeout(() => res("world"), 2000))
     );
 
-    const helloQuery = activeQuery(helloMock);
-    const worldQuery = activeQuery(worldMock);
+    const helloQuery = activeAsync(helloMock);
+    const worldQuery = activeAsync(worldMock);
 
     const computed = activeComputed(
       () => `${helloQuery.get()} ${worldQuery.get()}`
@@ -144,8 +144,8 @@ describe("createComputed", () => {
       () => new Promise((res) => setTimeout(() => res("world"), 2000))
     );
 
-    const helloQuery = activeQuery(helloMock);
-    const worldQuery = activeQuery(worldMock);
+    const helloQuery = activeAsync(helloMock);
+    const worldQuery = activeAsync(worldMock);
 
     const computed = activeComputed(() => {
       [helloQuery.state(), worldQuery.state()]; // prefetch

@@ -1,6 +1,6 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { activeTopic, compute, getActive } from "./core";
-import { activeQuery } from "./create-query";
+import { activeAsync } from "./create-query";
 
 describe("createTopic", () => {
   it("Calls subscribed function", () => {
@@ -80,7 +80,7 @@ describe("getActive", () => {
   jest.useFakeTimers();
 
   it("Returns async result", async () => {
-    const query = activeQuery(
+    const query = activeAsync(
       () => new Promise((res) => setTimeout(() => res("test"), 1000))
     );
 
@@ -90,7 +90,7 @@ describe("getActive", () => {
   });
 
   it("Throws async exception", async () => {
-    const query = activeQuery(
+    const query = activeAsync(
       () =>
         new Promise((res, reject) => setTimeout(() => reject("test"), 1000)),
       { retry: false }

@@ -1,12 +1,12 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { activeQuery } from "./create-query";
+import { activeAsync } from "./create-query";
 import { ActiveComputed, activeComputed } from "./create-computed";
 
 describe("createQuery", () => {
   jest.useFakeTimers();
 
   it("Returns pending result by default", () => {
-    const query = activeQuery(async (id: number) => ({ id }));
+    const query = activeAsync(async (id: number) => ({ id }));
     expect(query.state(1).isSuccess).toBe(false);
     expect(query.state(1).isError).toBe(false);
     expect(query.state(1).status).toBe("pending");
@@ -15,7 +15,7 @@ describe("createQuery", () => {
   });
 
   it("Throws promise when query is pending", () => {
-    const query = activeQuery(async (id: number) => ({ id }));
+    const query = activeAsync(async (id: number) => ({ id }));
     try {
       query.get(1);
       expect(true).toBeFalsy(); // this should not happen
@@ -25,7 +25,7 @@ describe("createQuery", () => {
   });
 
   it("Returns isFetching after starting fetch", async () => {
-    const query = activeQuery((id: number) => success(id));
+    const query = activeAsync((id: number) => success(id));
 
     expect(() => query.get(1)).toThrow();
 
@@ -36,7 +36,7 @@ describe("createQuery", () => {
   });
 
   it("Returns isUpdating when invalidated and there's an active subscription", async () => {
-    const query = activeQuery((id: number) => success(id));
+    const query = activeAsync((id: number) => success(id));
 
     // Start a subscription
     const unsubscribe = query.subscribe(() => null, 1);
@@ -58,7 +58,7 @@ describe("createQuery", () => {
   });
 
   it("Returns hasSuccess after fetch is done", async () => {
-    const query = activeQuery((id: number) => success(id));
+    const query = activeAsync((id: number) => success(id));
     query.state(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isSuccess).toBe(true);
@@ -66,7 +66,7 @@ describe("createQuery", () => {
   });
 
   it("Returns hasError after fetch fails", async () => {
-    const query = activeQuery((id: number) => failure(id), { retry: false });
+    const query = activeAsync((id: number) => failure(id), { retry: false });
     query.state(1);
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isError).toBe(true);
@@ -74,7 +74,7 @@ describe("createQuery", () => {
   });
 
   it("Returns provided initial data", async () => {
-    const query = activeQuery((id: number) => success(id), {
+    const query = activeAsync((id: number) => success(id), {
       initialState: (id) => ({ status: "success", data: -id, isStale: false }),
     });
     expect(query.state(1).isSuccess).toBe(true);
@@ -83,7 +83,7 @@ describe("createQuery", () => {
   });
 
   it("Fetches when initial data is stale", async () => {
-    const query = activeQuery((id: number) => success(id), {
+    const query = activeAsync((id: number) => success(id), {
       initialState: (id) => ({ status: "success", data: -id, isStale: true }),
     });
     expect(query.get(1)).toBe(-1);
@@ -93,7 +93,7 @@ describe("createQuery", () => {
   });
 
   it("Throws provided initial error", async () => {
-    const query = activeQuery((id: number) => success(id), {
+    const query = activeAsync((id: number) => success(id), {
       initialState: () => ({
         status: "error",
         error: new Error("Initial error"),
@@ -106,7 +106,7 @@ describe("createQuery", () => {
   });
 
   it("Always throws the same promise object when query is pending", async () => {
-    const query = activeQuery(() => new Promise((res) => setTimeout(res, 100)));
+    const query = activeAsync(() => new Promise((res) => setTimeout(res, 100)));
     const getResultPromise = () => {
       try {
         return query.get();
@@ -125,7 +125,7 @@ describe("createQuery", () => {
     const onUnsubscribe = jest.fn(() => null);
     const onSubscribe = jest.fn(() => onUnsubscribe);
 
-    const query = activeQuery(
+    const query = activeAsync(
       () => new Promise((res) => setTimeout(res, 100)),
       { onSubscribe }
     );
@@ -151,34 +151,47 @@ describe("createQuery", () => {
   });
 
   it("Returns data provided by setState", async () => {
-    const query = activeQuery((id: number) => success(id));
+    const query = activeAsync((id: number) => success(id));
     query.setState({ status: "success", data: 100, isStale: false }, 1);
 
     expect(query.get(1)).toEqual(100);
     expect(query.state(1).status).toEqual("success");
     expect(query.state(1).isFetching).toEqual(false);
 
-    const promise = query.getAsync(1);
+    const promise = query.getPromise(1);
+    await jest.advanceTimersByTimeAsync(200);
+    expect(promise).resolves.toEqual(100);
+  });
+
+  it("Returns data provided by set", async () => {
+    const query = activeAsync((id: number) => success(id));
+    query.set(100, 1);
+
+    expect(query.get(1)).toEqual(100);
+    expect(query.state(1).status).toEqual("success");
+    expect(query.state(1).isFetching).toEqual(false);
+
+    const promise = query.getPromise(1);
     await jest.advanceTimersByTimeAsync(200);
     expect(promise).resolves.toEqual(100);
   });
 
   it("After setState fetches data on 'get' if provided data is stale", async () => {
-    const query = activeQuery((id: number) => success(id));
+    const query = activeAsync((id: number) => success(id));
     query.setState({ status: "success", data: 100, isStale: true }, 1);
 
     expect(query.get(1)).toEqual(100);
     expect(query.state(1).status).toEqual("success");
     expect(query.state(1).isFetching).toEqual(true);
 
-    const promise = query.getAsync(1);
+    const promise = query.getPromise(1);
     await jest.advanceTimersByTimeAsync(200);
     expect(promise).resolves.toEqual(1);
   });
 
   it("Supports retrying after initial fetch fails", async () => {
     const factory = jest.fn((id: number) => failure(id));
-    const query = activeQuery(factory);
+    const query = activeAsync(factory);
     query.state(1);
     await jest.advanceTimersByTimeAsync(5000);
     expect(query.state(1).isError).toBe(true);
