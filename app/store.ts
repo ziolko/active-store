@@ -1,19 +1,19 @@
 import {
-  activeState,
-  activeComputed,
-  activeQuery,
-  ActiveComputed,
-  ActiveQuery,
+  state,
+  computed,
+  query,
+  Computed,
+  Query,
 } from "../lib";
 import { activeMap } from "../lib/create-collection";
 
 type ToDoItem = { id: number; name: string; isDone: boolean };
 
 function createTodoApp() {
-  const newItem = activeState("");
-  const items = activeState<ToDoItem[]>([]);
+  const newItem = state("");
+  const items = state<ToDoItem[]>([]);
 
-  const time = activeQuery(
+  const time = query(
     () => new Promise<number>((res) => setTimeout(() => res(Date.now()), 1000)),
     {
       onSubscribe() {
@@ -53,21 +53,21 @@ function createTodoApp() {
     );
   };
 
-  const count = activeComputed((value: number) => items.get().length + value);
+  const count = computed((value: number) => items.get().length + value);
 
-  const breedList = activeQuery(async () => {
+  const breedList = query(async () => {
     await new Promise((x) => setTimeout(x, 500));
     const x_1 = await fetch("https://dog.ceo/api/breeds/list/all");
     const data = await x_1.json();
     return Object.keys(data.message).filter((_, i) => i > -1) as string[];
   });
 
-  const breedUpperCase = activeComputed(() => {
+  const breedUpperCase = computed(() => {
     const breeds = breedList.get();
     return breeds.map((item) => item.toUpperCase());
   });
 
-  const query = activeQuery(
+  const testQuery = query(
     (name: string) =>
       new Promise<string>((res) => {
         console.log("Refetch", name);
@@ -75,9 +75,9 @@ function createTodoApp() {
       })
   );
 
-  attacheRefetchOnTabVisible(query);
+  attacheRefetchOnTabVisible(testQuery);
 
-  const optimisticQuery = activeLocalState(query);
+  const optimisticQuery = activeLocalState(testQuery);
 
   return {
     newItem,
@@ -94,7 +94,7 @@ function createTodoApp() {
   };
 }
 
-function attacheRefetchOnTabVisible<S extends ActiveQuery<any>>(source: S) {
+function attacheRefetchOnTabVisible<S extends Query<any>>(source: S) {
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
       source.invalidate(() => true);
@@ -102,7 +102,7 @@ function attacheRefetchOnTabVisible<S extends ActiveQuery<any>>(source: S) {
   });
 }
 
-function activeLocalState<S extends ActiveQuery<any> | ActiveComputed<any>>(
+function activeLocalState<S extends Query<any> | Computed<any>>(
   source: S
 ) {
   const localValueMap = activeMap({
@@ -112,7 +112,7 @@ function activeLocalState<S extends ActiveQuery<any> | ActiveComputed<any>>(
 
   let lastLocalValueId = 0;
   return {
-    ...activeComputed(
+    ...computed(
       (...params: Parameters<S["get"]>): ReturnType<S["get"]> => {
         const localState = localValueMap.getOrCreate(...params);
         return localState === null ? source.get(...params) : localState.value;

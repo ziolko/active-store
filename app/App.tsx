@@ -1,19 +1,19 @@
 import store from "./store";
-import { useActive, ActiveBoundary, ActiveBoundaryErrorProps } from "../lib";
+import { useStore, Boundary, BoundaryErrorProps } from "../lib";
 
 export default function () {
   return (
-    <ActiveBoundary
+    <Boundary
       fallback="Loading..."
       errorFallback={ErrorHandler}
       onError={(err) => console.log("My error", err)}
     >
       <App />
-    </ActiveBoundary>
+    </Boundary>
   );
 }
 
-function ErrorHandler(props: ActiveBoundaryErrorProps) {
+function ErrorHandler(props: BoundaryErrorProps) {
   return (
     <div>
       Error: {props.error.message}{" "}
@@ -30,9 +30,9 @@ function ErrorHandler(props: ActiveBoundaryErrorProps) {
 }
 
 function App() {
-  const optimistic = useActive(() => store.optimisticQuery.get("mateusz"));
-  const breed = useActive(store.breedUpperCase);
-  const time = useActive(store.time.state);
+  const optimistic = useStore(() => store.optimisticQuery.get("mateusz"));
+  const breed = useStore(store.breedUpperCase);
+  const time = useStore(store.time.state);
 
   return (
     <div>
