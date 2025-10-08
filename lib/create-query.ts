@@ -13,7 +13,7 @@ type State<R> = {
   dataUpdatedAt?: number;
   errorUpdatedAt?: number;
   status: "pending" | "success" | "error";
-  fetchStatus: "fetching" | "paused" | "idle";
+  fetchStatus: "fetching" | "idle";
 };
 
 type InitialState<R> =
@@ -55,7 +55,7 @@ export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   invalidateOne: (...params: Parameters<S>) => Promise<void>;
   invalidate: (
     predicate?: ((...params: Parameters<S>) => boolean) | true,
-    options?: { reset?: boolean }
+    options?: { reset?: boolean, fetching?: boolean }
   ) => Promise<void>;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
@@ -127,12 +127,12 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
     },
     async invalidate(
       predicate?: ((...params: Parameters<S>) => boolean) | true,
-      options?: { reset?: boolean }
+      options?: { reset?: boolean, fetching?: boolean }
     ) {
       const promises: Promise<void>[] = [];
       predicate = typeof predicate === "function" ? predicate : () => true;
       for (const item of collection.filter(predicate)) {
-        promises.push(item.invalidate(options?.reset));
+        promises.push(item.invalidate(options?.reset, options?.fetching));
       }
       await Promise.all(promises);
     },
@@ -264,7 +264,11 @@ function createQuerySingle<R>(
     state.notify();
   }
 
-  async function invalidate(reset?: boolean) {
+  async function invalidate(reset?: boolean, fetching?: boolean) {
+    if (currentState.isFetching && !fetching) {
+      return;
+    }
+
     currentState = reset
       ? getFullState({ status: "pending" })
       : { ...currentState, isStale: true };

@@ -8,6 +8,7 @@ export interface ActiveComputedOptions {
 
 export interface State<R> {
   status: "pending" | "success" | "error";
+  fetchStatus: "fetching" | "idle";
   data?: R;
   error?: any;
 }
@@ -43,9 +44,10 @@ export function activeComputed<S extends (...args: any) => any>(
     state(...params: P) {
       const state = collection.getOrCreate(...params).get();
       return {
-        status: state.hasFetchingQueries ? 'pending' : state.error ? 'error' : 'success',
+        status: state.error ? 'error' : state.value ? 'success' : 'pending',
         error: state.error,
         data: state.value,
+        fetchStatus: state.hasFetchingQueries ? 'fetching' : 'idle',
       }
     },
     promise(...params: P): Promise<R> {
