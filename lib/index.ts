@@ -2,7 +2,7 @@
 export { activeState as state } from "./create-state";
 export { activeAsync as query } from "./create-query";
 export { activeComputed as computed } from "./create-computed";
-export { useActive as useStore } from "./react";
+export { useActive as useSelector } from "./react";
 
 // Plumbing
 
