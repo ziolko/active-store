@@ -95,6 +95,7 @@ export interface Dependency {
 }
 
 let currentDependencies: Set<Dependency> | null = null;
+export let currentHasFetchingQueries = { value: false };
 
 export interface ComputeOptions {
   trackDependencies?: boolean;
@@ -105,30 +106,19 @@ export function compute<R>(
   { trackDependencies = true }: ComputeOptions = {}
 ) {
   const previousDependencies = currentDependencies;
+  const previousHasFetchingQueries = currentHasFetchingQueries;
 
   const dependencies = trackDependencies ? new Set<Dependency>() : null;
   try {
     currentDependencies = dependencies;
-    return { value: selector() as R, dependencies: dependencies ?? new Set() };
+    currentHasFetchingQueries = { value: false };
+    return { value: selector() as R, dependencies: dependencies ?? new Set(), hasFetchingQueries: currentHasFetchingQueries.value };
   } catch (error) {
-    return { error, dependencies: dependencies ?? new Set() };
+    return { error, dependencies: dependencies ?? new Set(), hasFetchingQueries: currentHasFetchingQueries.value };
   } finally {
     currentDependencies = previousDependencies;
+    currentHasFetchingQueries = previousHasFetchingQueries;
   }
 }
 
 export let isRunningReactSelector = { value: false };
-
-export async function getActive<T>(fn: (() => T) | Active<T>): Promise<T> {
-  do {
-    try {
-      return typeof fn === "function" ? fn() : fn.get();
-    } catch (error: any) {
-      if (error instanceof Promise || typeof error?.then === "function") {
-        await error;
-      } else {
-        throw error;
-      }
-    }
-  } while (true);
-}

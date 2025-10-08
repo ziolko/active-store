@@ -14,20 +14,15 @@ describe("createQuery", () => {
     expect(query.state(1).isRefetching).toBe(false);
   });
 
-  it("Throws promise when query is pending", () => {
+  it("Returns undefined when query is pending", () => {
     const query = activeAsync(async (id: number) => ({ id }));
-    try {
-      query.get(1);
-      expect(true).toBeFalsy(); // this should not happen
-    } catch (error) {
-      expect(error instanceof Promise).toBeTruthy;
-    }
+    expect(query.get(1)).toBe(undefined);
   });
 
   it("Returns isFetching after starting fetch", async () => {
     const query = activeAsync((id: number) => success(id));
 
-    expect(() => query.get(1)).toThrow();
+    expect(query.get(1)).toBe(undefined);
 
     expect(query.state(1).status).toBe("pending");
     expect(query.state(1).isFetching).toBe(true);
@@ -59,7 +54,8 @@ describe("createQuery", () => {
 
   it("Returns hasSuccess after fetch is done", async () => {
     const query = activeAsync((id: number) => success(id));
-    query.state(1);
+    expect(query.get(1)).toBe(undefined);
+
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).isSuccess).toBe(true);
     expect(query.get(1)).toBe(1);
@@ -105,22 +101,6 @@ describe("createQuery", () => {
     expect(() => query.get(1)).toThrowError("Initial error");
   });
 
-  it("Always throws the same promise object when query is pending", async () => {
-    const query = activeAsync(() => new Promise((res) => setTimeout(res, 100)));
-    const getResultPromise = () => {
-      try {
-        return query.get();
-      } catch (error) {
-        return error;
-      }
-    };
-
-    const firstPromise = getResultPromise();
-    const secondPromise = getResultPromise();
-
-    expect(firstPromise === secondPromise).toBeTruthy();
-  });
-
   it("Calls onSubscribe and unsubscribe callbacks", async () => {
     const onUnsubscribe = jest.fn(() => null);
     const onSubscribe = jest.fn(() => onUnsubscribe);
@@ -158,7 +138,7 @@ describe("createQuery", () => {
     expect(query.state(1).status).toEqual("success");
     expect(query.state(1).isFetching).toEqual(false);
 
-    const promise = query.getPromise(1);
+    const promise = query.promise(1);
     await jest.advanceTimersByTimeAsync(200);
     expect(promise).resolves.toEqual(100);
   });
@@ -171,7 +151,7 @@ describe("createQuery", () => {
     expect(query.state(1).status).toEqual("success");
     expect(query.state(1).isFetching).toEqual(false);
 
-    const promise = query.getPromise(1);
+    const promise = query.promise(1);
     await jest.advanceTimersByTimeAsync(200);
     expect(promise).resolves.toEqual(100);
   });
@@ -184,7 +164,7 @@ describe("createQuery", () => {
     expect(query.state(1).status).toEqual("success");
     expect(query.state(1).isFetching).toEqual(true);
 
-    const promise = query.getPromise(1);
+    const promise = query.promise(1);
     await jest.advanceTimersByTimeAsync(200);
     expect(promise).resolves.toEqual(1);
   });

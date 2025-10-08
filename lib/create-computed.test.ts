@@ -1,7 +1,7 @@
 import { expect, describe, it, jest } from "@jest/globals";
 import { activeState } from "./create-state";
 import { activeComputed } from "./create-computed";
-import { activeTopic, compute, getActive } from "./core";
+import { activeTopic, compute } from "./core";
 import { activeAsync } from "./create-query";
 
 describe("createComputed", () => {
@@ -9,14 +9,14 @@ describe("createComputed", () => {
 
   it("Returns computed value", () => {
     const { computed } = createTestContext();
-    expect(computed.get().text).toEqual("Hello World");
+    expect(computed.get()?.text).toEqual("Hello World");
   });
 
   it("Updates returned value when one of dependencies changes", () => {
     const { world, computed } = createTestContext();
 
     world.set("DEMO");
-    expect(computed.get().text).toBe("Hello DEMO");
+    expect(computed.get()?.text).toBe("Hello DEMO");
   });
 
   it("Doesn't recompute value with each 'get' if there's no active subscription", () => {
@@ -85,12 +85,10 @@ describe("createComputed", () => {
     expect(listener).toHaveBeenCalledTimes(0);
 
     world.set("DEMO 1");
-    expect(topic.get()).toEqual({ text: "Hello DEMO 1" });
     expect(listener).toHaveBeenCalledTimes(1);
 
     world.set("DEMO 2");
     expect(listener).toHaveBeenCalledTimes(2);
-    expect(topic.get()).toEqual({ text: "Hello DEMO 2" });
   });
 
   it("computed.promise waits until query resolves", async () => {
@@ -98,13 +96,12 @@ describe("createComputed", () => {
       () =>
         new Promise((resolve) => setTimeout(() => resolve("Hello world"), 2000))
     );
-    const computed = activeComputed(() => query.get());
-    const promise = getActive(computed);
+    const promise = activeComputed(() => query.get()).promise();
     await jest.advanceTimersByTimeAsync(5000);
     expect(await promise).toBe("Hello world");
   });
 
-  it("computed.promise runs queries sequentially", async () => {
+  it("computed.promise runs queries in parallel", async () => {
     const helloMock = jest.fn(
       () => new Promise((res) => setTimeout(() => res("Hello"), 2000))
     );
@@ -122,40 +119,7 @@ describe("createComputed", () => {
     expect(helloMock).not.toBeCalled();
     expect(worldMock).not.toBeCalled();
 
-    const promise = getActive(computed);
-
-    expect(helloMock).toBeCalled();
-    expect(worldMock).not.toBeCalled();
-
-    await jest.advanceTimersByTimeAsync(3000);
-
-    expect(helloMock).toBeCalled();
-    expect(worldMock).toBeCalled();
-
-    await jest.advanceTimersByTimeAsync(3000);
-    expect(await promise).toBe("Hello world");
-  });
-
-  it("computed.promise runs queries in parallel when prefetched with query.state", async () => {
-    const helloMock = jest.fn(
-      () => new Promise((res) => setTimeout(() => res("Hello"), 2000))
-    );
-    const worldMock = jest.fn(
-      () => new Promise((res) => setTimeout(() => res("world"), 2000))
-    );
-
-    const helloQuery = activeAsync(helloMock);
-    const worldQuery = activeAsync(worldMock);
-
-    const computed = activeComputed(() => {
-      [helloQuery.state(), worldQuery.state()]; // prefetch
-      return `${helloQuery.get()} ${worldQuery.get()}`;
-    });
-
-    expect(helloMock).not.toBeCalled();
-    expect(worldMock).not.toBeCalled();
-
-    const promise = getActive(computed);
+    const promise = computed.promise();
 
     expect(helloMock).toBeCalled();
     expect(worldMock).toBeCalled();

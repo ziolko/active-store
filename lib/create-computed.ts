@@ -13,9 +13,9 @@ export interface State<R> {
 }
 
 export interface ActiveComputed<S extends (...args: any) => any> {
-  get: (...params: Parameters<S>) => ReturnType<S>;
+  get: (...params: Parameters<S>) => ReturnType<S> | undefined;
   state: (...params: Parameters<S>) => State<ReturnType<S>>;
-  prefetch: (...params: Parameters<S>) => State<ReturnType<S>>;
+  promise: (...params: Parameters<S>) => Promise<ReturnType<S>>;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
@@ -32,27 +32,35 @@ export function activeComputed<S extends (...args: any) => any>(
     gcTime,
   });
 
-  function state(...params: P): State<R> {
-    try {
-      return {
-        status: "success",
-        data: collection.getOrCreate(...params).get(),
-      };
-    } catch (error: any) {
-      if (error instanceof Promise || typeof error?.then === "function") {
-        return { status: "pending" };
-      } else {
-        return { error, status: "error" };
-      }
-    }
-  }
-
   const result: ActiveComputed<S> = {
-    get(...params: P): R {
-      return collection.getOrCreate(...params).get();
+    get(...params: P): (R | undefined) {
+      const state = collection.getOrCreate(...params).get();
+      if(state.error) {
+        throw state.error;
+      }
+      return state.value;
     },
-    state,
-    prefetch: state,
+    state(...params: P) {
+      const state = collection.getOrCreate(...params).get();
+      return {
+        status: state.hasFetchingQueries ? 'pending' : state.error ? 'error' : 'success',
+        error: state.error,
+        data: state.value,
+      }
+    },
+    promise(...params: P): Promise<R> {
+      return new Promise((resolve, reject) => {
+        return collection.getOrCreate(...params).subscribe(() => {
+          const state = collection.getOrCreate(...params).get();
+          if(!state.hasFetchingQueries) {
+            resolve(state.value!);
+          }
+          if(!state.hasFetchingQueries && state.error) {
+            reject(state.error);
+          }
+        })
+      })
+    },
     subscribe: (listener: () => void, ...params: P) => {
       const unsubscribe1 = collection.subscribe(listener, ...params);
       const unsubscribe2 = collection
@@ -75,6 +83,7 @@ function createComputedSingle<R>(selector: () => R) {
     error: undefined as any,
     isSubscribed: false,
     hasAnyDependencyChanged: false,
+    hasFetchingQueries: false,
     notifyAboutChanges: null as null | (() => void),
   };
 
@@ -90,7 +99,7 @@ function createComputedSingle<R>(selector: () => R) {
           throw state.error;
         }
 
-        return state.value;
+        return state;
       }
 
       if (!state.isSubscribed && !dependencies.hasChanged()) {
@@ -98,35 +107,33 @@ function createComputedSingle<R>(selector: () => R) {
           throw state.error;
         }
 
-        return state.value;
+        return state;
       }
 
-      const { value, error, dependencies: topics } = compute(selector);
+      const { value, error, dependencies: topics, hasFetchingQueries } = compute(selector);
 
       dependencies.update(topics);
       state.hasAnyDependencyChanged = false;
       state.value = value;
       state.error = error;
+      state.hasFetchingQueries = hasFetchingQueries;
 
       if (state.isSubscribed) {
         dependencies.subscribe();
       }
 
-      if (state.error) {
-        throw state.error;
-      }
-
-      return value;
+      return state;
     },
     function onSubscribe(notifyAboutChanges) {
       state.isSubscribed = true;
       state.notifyAboutChanges = notifyAboutChanges;
 
       if (dependencies.hasChanged()) {
-        const { value, error, dependencies: topics } = compute(selector);
+        const { value, error, dependencies: topics, hasFetchingQueries } = compute(selector);
         dependencies.update(topics);
         state.value = value;
         state.error = error;
+        state.hasFetchingQueries = hasFetchingQueries;
         notifyAboutChanges();
       }
 
@@ -141,5 +148,5 @@ function createComputedSingle<R>(selector: () => R) {
     }
   );
 
-  return { get: () => topic.get() as R, subscribe: topic.subscribe };
+  return { get: () => topic.get(), subscribe: topic.subscribe };
 }

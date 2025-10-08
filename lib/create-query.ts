@@ -1,4 +1,4 @@
-import { activeTopic, compute } from "./core";
+import {activeTopic, compute, currentHasFetchingQueries} from "./core";
 import { activeMap } from "./create-collection";
 
 type State<R> = {
@@ -37,17 +37,14 @@ export type ActiveAsyncOptions<S extends (...args: any) => Promise<any>> = {
 export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   get: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? A : never;
+  ) => ReturnType<S> extends Promise<infer A> ? (A | undefined) : never;
   set: (
     value: ReturnType<S> extends Promise<infer A> ? A : never,
     ...params: Parameters<S>
   ) => void;
-  getPromise: (
+  promise: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? Promise<A> : never;
-  prefetch: (
-    ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
@@ -99,28 +96,24 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
   const result: ActiveAsync<S> = {
     get(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
-      // Start fetching data if it's not fetching yet. Errors are caught so that
-      // React suspense always re-renders the components instead of showing an error
-      const promise = item.promiseForSuspense(params);
+      // Start fetching data if it's not fetching yet
+      item.promise().catch(() => null);
       const result = item.get();
 
-      if (result.isSuccess) return result.data!;
-      else if (result.isError) throw result.error!;
-      else throw promise;
+      if (result.isFetching) {
+        currentHasFetchingQueries.value = true;
+      }
+
+      if (result.isError) throw result.error!;
+      return result.data!;
     },
-    getPromise(...params: Parameters<S>) {
+    promise(...params: Parameters<S>) {
       return collection.getOrCreate(...(params as any)).promise();
-    },
-    prefetch(...params: Parameters<S>) {
-      const item = collection.getOrCreate(...(params as any));
-      // Start fetching data if it's not fetching yets
-      item.promiseForSuspense(params);
-      return item.get() as any;
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
-      // Start fetching data if it's not fetching yets
-      item.promiseForSuspense(params);
+      // Start fetching data if it's not fetching yet
+      item.promise().catch(() => null);
       return item.get() as any;
     },
     setState(state: InitialState<R>, ...params: Parameters<S>) {
@@ -167,7 +160,6 @@ function createQuerySingle<R>(
   let isSubscribed = false;
   let currentState = getFullState(initialState);
   let currentPromise: any = null;
-  let currentPromiseForSuspense: any = null;
 
   if (currentState.isSuccess) {
     currentPromise = Promise.resolve(currentState.data);
@@ -211,7 +203,6 @@ function createQuerySingle<R>(
     const { value, error } = compute(factory, { trackDependencies: false });
 
     currentPromise = null;
-    currentPromiseForSuspense = null;
 
     if (error) {
       currentPromise = Promise.reject(error);
@@ -278,7 +269,6 @@ function createQuerySingle<R>(
       ? getFullState({ status: "pending" })
       : { ...currentState, isStale: true };
     currentPromise = null;
-    currentPromiseForSuspense = null;
     if (isSubscribed) {
       await fetchIfNeedRefresh().catch(() => null);
     }
@@ -287,7 +277,6 @@ function createQuerySingle<R>(
   async function setState(newState: InitialState<R>) {
     currentState = getFullState(newState);
     currentPromise = null;
-    currentPromiseForSuspense = null;
 
     if (currentState.isSuccess) {
       currentPromise = Promise.resolve(currentState.data);
@@ -309,24 +298,6 @@ function createQuerySingle<R>(
     get: state.get,
     subscribe: state.subscribe,
     promise: fetchIfNeedRefresh,
-    promiseForSuspense: (params: any[]) => {
-      if (!currentPromiseForSuspense) {
-        const promise = fetchIfNeedRefresh().then(
-          () => null,
-          () => null
-        );
-        currentPromiseForSuspense = Error(
-          `activeQuery is still fetching data for params: (${params.join(
-            ", "
-          )}). If you've got this error in React component or 'activeComputed' you must rethrow it immediately. Otherwise use 'getActive' to wait for the requested value.`
-        );
-        currentPromiseForSuspense.then = Promise.prototype.then.bind(promise);
-        currentPromiseForSuspense.catch = Promise.prototype.catch.bind(promise);
-        currentPromiseForSuspense.finally =
-          Promise.prototype.finally.bind(promise);
-      }
-      return currentPromiseForSuspense;
-    },
     invalidate,
     setState,
   };

@@ -1,5 +1,5 @@
 import { expect, describe, it, jest } from "@jest/globals";
-import { activeTopic, compute, getActive } from "./core";
+import { activeTopic, compute } from "./core";
 import { activeAsync } from "./create-query";
 
 describe("createTopic", () => {
@@ -76,27 +76,3 @@ describe("compute", () => {
   });
 });
 
-describe("getActive", () => {
-  jest.useFakeTimers();
-
-  it("Returns async result", async () => {
-    const query = activeAsync(
-      () => new Promise((res) => setTimeout(() => res("test"), 1000))
-    );
-
-    const promise = getActive(query);
-    await jest.advanceTimersByTimeAsync(1500);
-    await expect(promise).resolves.toEqual("test");
-  });
-
-  it("Throws async exception", async () => {
-    const query = activeAsync(
-      () =>
-        new Promise((res, reject) => setTimeout(() => reject("test"), 1000)),
-      { retry: false }
-    );
-
-    expect(getActive(query)).rejects.toBe("test");
-    await jest.advanceTimersByTimeAsync(1500);
-  });
-});
