@@ -44,7 +44,7 @@ export function activeComputed<S extends (...args: any) => any>(
     state(...params: P) {
       const state = collection.getOrCreate(...params).get();
       return {
-        status: state.error ? 'error' : state.value ? 'success' : 'pending',
+        status: state.error ? 'error' : state.value ? 'success' : state.hasFetchingQueries ? 'pending' : 'success',
         error: state.error,
         data: state.value,
         fetchStatus: state.hasFetchingQueries ? 'fetching' : 'idle',
