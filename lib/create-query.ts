@@ -38,8 +38,7 @@ export type FetchPolicy =
   | "cache-first"
   | "cache-and-network"
   | "network-only"
-  | "no-cache"
-  | "clear-cache";
+  | "no-cache";
 
 export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   get: (
@@ -51,7 +50,7 @@ export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   ) => void;
   invalidate: (
     predicate?: ((...params: Parameters<S>) => boolean) | true,
-    options?: { reset?: boolean }
+    options?: { reset?: boolean, fetching?: boolean },
   ) => Promise<void>;
   fetch: (
     options: { policy: FetchPolicy },
@@ -60,7 +59,6 @@ export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
-  forEach: (predicate: (...params: Parameters<S>) => void) => void;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
@@ -168,9 +166,6 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
         promises.push(item.invalidate(options?.reset, options?.fetching));
       }
       await Promise.all(promises);
-    },
-    forEach(predicate: (...params: Parameters<S>) => void) {
-      collection.filter(predicate as any);
     },
     subscribe(listener: () => void, ...params: Parameters<S>) {
       const unsubscribe1 = collection.subscribe(listener, ...params);
