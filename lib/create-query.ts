@@ -1,4 +1,4 @@
-import {activeTopic, compute, currentHasFetchingQueries} from "./core";
+import { activeTopic, compute, currentHasFetchingQueries } from "./core";
 import { activeMap } from "./create-collection";
 
 type State<R> = {
@@ -34,15 +34,22 @@ export type ActiveAsyncOptions<S extends (...args: any) => Promise<any>> = {
   onSubscribe?: (...params: Parameters<S>) => () => void;
 };
 
+export type FetchPolicy =
+  | "cache-first"
+  | "cache-and-network"
+  | "network-only"
+  | "no-cache";
+
 export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   get: (
     ...params: Parameters<S>
-  ) => ReturnType<S> extends Promise<infer A> ? (A | undefined) : never;
+  ) => ReturnType<S> extends Promise<infer A> ? A | undefined : never;
   set: (
     value: ReturnType<S> extends Promise<infer A> ? A : never,
     ...params: Parameters<S>
   ) => void;
-  promise: (
+  fetch: (
+    options: { policy: FetchPolicy },
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? Promise<A> : never;
   state: (
@@ -52,17 +59,13 @@ export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
     state: InitialState<ReturnType<S> extends Promise<infer A> ? A : never>,
     ...params: Parameters<S>
   ) => void;
-  invalidateOne: (...params: Parameters<S>) => Promise<void>;
-  invalidate: (
-    predicate?: ((...params: Parameters<S>) => boolean) | true,
-    options?: { reset?: boolean, fetching?: boolean }
-  ) => Promise<void>;
+  forEach: (predicate: (...params: Parameters<S>) => void) => void;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
 
 export function activeAsync<S extends (...args: any) => Promise<any>>(
   factory: S,
-  options: ActiveAsyncOptions<S> = {}
+  options: ActiveAsyncOptions<S> = {},
 ): ActiveAsync<S> {
   type P = Parameters<S>;
   type R = ReturnType<S> extends Promise<infer A> ? A : never;
@@ -84,10 +87,10 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
       return createQuerySingle<R>(
         withRetry(
           () => factory(...(params as any[])),
-          (options.retry ?? 2) || 0
+          (options.retry ?? 2) || 0,
         ),
         initialState,
-        onSubscribe
+        onSubscribe,
       );
     },
     gcTime: options.gcTime ?? Number.POSITIVE_INFINITY,
@@ -107,8 +110,41 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
       if (result.isError) throw result.error!;
       return result.data!;
     },
-    promise(...params: Parameters<S>) {
-      return collection.getOrCreate(...(params as any)).promise();
+    fetch(options: { policy: FetchPolicy }, ...params: Parameters<S>) {
+      if (options.policy === "no-cache") {
+        return factory(...params);
+      }
+
+      const item = collection.getOrCreate(...(params as any));
+      const state = item.get();
+
+      if (options.policy === "network-only") {
+        item.setState({ ...state, isStale: true } as InitialState<R>);
+        return item.promise();
+      }
+
+      if (options.policy === "cache-and-network") {
+        item.setState({ ...state, isStale: true } as InitialState<R>);
+        item.promise();
+
+        if (state.isSuccess && !state.isStale) {
+          return Promise.resolve(state.data);
+        }
+
+        return item.promise();
+      }
+
+      if (options.policy === "cache-first") {
+        if (state.isSuccess && !state.isStale) {
+          return Promise.resolve(state.data);
+        }
+
+        return item.promise();
+      }
+
+      return Promise.reject(
+        new Error(`Unknown fetch policy: ${options.policy}`),
+      );
     },
     state(...params: Parameters<S>) {
       const item = collection.getOrCreate(...(params as any));
@@ -120,21 +156,12 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
       collection.getOrCreate(...(params as any)).setState(state);
     },
     set(value: R, ...params: Parameters<S>) {
-      collection.getOrCreate(...(params as any)).setState({ status: 'success', data: value, isStale: false });
+      collection
+        .getOrCreate(...(params as any))
+        .setState({ status: "success", data: value, isStale: false });
     },
-    invalidateOne(...params: Parameters<S>) {
-      return collection.getOrCreate(...(params as any)).invalidate();
-    },
-    async invalidate(
-      predicate?: ((...params: Parameters<S>) => boolean) | true,
-      options?: { reset?: boolean, fetching?: boolean }
-    ) {
-      const promises: Promise<void>[] = [];
-      predicate = typeof predicate === "function" ? predicate : () => true;
-      for (const item of collection.filter(predicate)) {
-        promises.push(item.invalidate(options?.reset, options?.fetching));
-      }
-      await Promise.all(promises);
+    forEach(predicate: (...params: Parameters<S>) => void) {
+      collection.filter(() => predicate as any);
     },
     subscribe(listener: () => void, ...params: Parameters<S>) {
       const unsubscribe1 = collection.subscribe(listener, ...params);
@@ -155,7 +182,7 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
 function createQuerySingle<R>(
   factory: () => R | Promise<R>,
   initialState: InitialState<R>,
-  onSubscribeParam: () => () => void
+  onSubscribeParam: () => () => void,
 ) {
   let isSubscribed = false;
   let currentState = getFullState(initialState);
@@ -182,7 +209,7 @@ function createQuerySingle<R>(
         isSubscribed = false;
         unsubscribe();
       };
-    }
+    },
   );
 
   function fetchIfNeedRefresh() {
@@ -225,7 +252,7 @@ function createQuerySingle<R>(
     //@ts-expect-error
     value.then(
       (data: any) => value === currentPromise && setSuccess(data),
-      (error: any) => value === currentPromise && setError(error)
+      (error: any) => value === currentPromise && setError(error),
     );
     return value;
   }
@@ -278,7 +305,7 @@ function createQuerySingle<R>(
     }
   }
 
-  async function setState(newState: InitialState<R>) {
+  function setState(newState: InitialState<R>) {
     currentState = getFullState(newState);
     currentPromise = null;
 
@@ -352,7 +379,7 @@ function getFullState<R>(initialState: InitialState<R>): State<R> {
 
 function withRetry<S extends () => Promise<any>>(
   factory: S,
-  retryCount: number
+  retryCount: number,
 ) {
   function run(attempt: number): Promise<any> {
     let promise = null;
@@ -377,5 +404,6 @@ function withRetry<S extends () => Promise<any>>(
       }
     });
   }
+
   return () => run(0);
 }
