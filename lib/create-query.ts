@@ -161,7 +161,7 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
         .setState({ status: "success", data: value, isStale: false });
     },
     forEach(predicate: (...params: Parameters<S>) => void) {
-      collection.filter(() => predicate as any);
+      collection.filter(predicate as any);
     },
     subscribe(listener: () => void, ...params: Parameters<S>) {
       const unsubscribe1 = collection.subscribe(listener, ...params);
