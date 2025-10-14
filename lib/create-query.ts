@@ -1,5 +1,5 @@
-import { activeTopic, compute, currentHasFetchingQueries } from "./core";
-import { activeMap } from "./create-collection";
+import {activeTopic, compute, currentHasFetchingQueries} from "./core";
+import {activeMap} from "./create-collection";
 
 type State<R> = {
   isPending: boolean;
@@ -19,10 +19,10 @@ type State<R> = {
 type InitialState<R> =
   | { status: "pending" }
   | {
-      status: "success";
-      data: R;
-      isStale: boolean;
-    }
+  status: "success";
+  data: R;
+  isStale: boolean;
+}
   | { status: "error"; error: any; isStale: boolean };
 
 export type ActiveAsyncOptions<S extends (...args: any) => Promise<any>> = {
@@ -38,7 +38,8 @@ export type FetchPolicy =
   | "cache-first"
   | "cache-and-network"
   | "network-only"
-  | "no-cache";
+  | "no-cache"
+  | "clear-cache";
 
 export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   get: (
@@ -48,6 +49,7 @@ export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
     value: ReturnType<S> extends Promise<infer A> ? A : never,
     ...params: Parameters<S>
   ) => void;
+  markStale: (...params: Parameters<S>) => void,
   fetch: (
     options: { policy: FetchPolicy },
     ...params: Parameters<S>
@@ -55,10 +57,6 @@ export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
   state: (
     ...params: Parameters<S>
   ) => ReturnType<S> extends Promise<infer A> ? State<A> : never;
-  setState: (
-    state: InitialState<ReturnType<S> extends Promise<infer A> ? A : never>,
-    ...params: Parameters<S>
-  ) => void;
   forEach: (predicate: (...params: Parameters<S>) => void) => void;
   subscribe: (listener: () => void, ...params: Parameters<S>) => () => void;
 }
@@ -119,12 +117,12 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
       const state = item.get();
 
       if (options.policy === "network-only") {
-        item.setState({ ...state, isStale: true } as InitialState<R>);
+        item.setState({...state, isStale: true} as InitialState<R>);
         return item.promise();
       }
 
       if (options.policy === "cache-and-network") {
-        item.setState({ ...state, isStale: true } as InitialState<R>);
+        item.setState({...state, isStale: true} as InitialState<R>);
         item.promise();
 
         if (state.isSuccess && !state.isStale) {
@@ -152,13 +150,15 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
       item.promise().catch(() => null);
       return item.get() as any;
     },
-    setState(state: InitialState<R>, ...params: Parameters<S>) {
-      collection.getOrCreate(...(params as any)).setState(state);
-    },
     set(value: R, ...params: Parameters<S>) {
       collection
         .getOrCreate(...(params as any))
-        .setState({ status: "success", data: value, isStale: false });
+        .setState({status: "success", data: value, isStale: false});
+    },
+    markStale(...params: Parameters<S>) {
+      const item = collection
+        .getOrCreate(...(params as any));
+      item.setState({...item.get(), isStale: true} as InitialState<R>);
     },
     forEach(predicate: (...params: Parameters<S>) => void) {
       collection.filter(predicate as any);
@@ -227,7 +227,7 @@ function createQuerySingle<R>(
       isRefetching: !isInitialLoading,
     };
 
-    const { value, error } = compute(factory, { trackDependencies: false });
+    const {value, error} = compute(factory, {trackDependencies: false});
 
     currentPromise = null;
 
@@ -291,20 +291,6 @@ function createQuerySingle<R>(
     state.notify();
   }
 
-  async function invalidate(reset?: boolean, fetching?: boolean) {
-    if (currentState.isFetching && !fetching) {
-      return;
-    }
-
-    currentState = reset
-      ? getFullState({ status: "pending" })
-      : { ...currentState, isStale: true };
-    currentPromise = null;
-    if (isSubscribed) {
-      await fetchIfNeedRefresh().catch(() => null);
-    }
-  }
-
   function setState(newState: InitialState<R>) {
     currentState = getFullState(newState);
     currentPromise = null;
@@ -329,7 +315,6 @@ function createQuerySingle<R>(
     get: state.get,
     subscribe: state.subscribe,
     promise: fetchIfNeedRefresh,
-    invalidate,
     setState,
   };
 }
