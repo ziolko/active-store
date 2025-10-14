@@ -49,7 +49,10 @@ export interface ActiveAsync<S extends (...args: any) => Promise<any>> {
     value: ReturnType<S> extends Promise<infer A> ? A : never,
     ...params: Parameters<S>
   ) => void;
-  markStale: (...params: Parameters<S>) => void,
+  invalidate: (
+    predicate?: ((...params: Parameters<S>) => boolean) | true,
+    options?: { reset?: boolean }
+  ) => Promise<void>;
   fetch: (
     options: { policy: FetchPolicy },
     ...params: Parameters<S>
@@ -155,10 +158,16 @@ export function activeAsync<S extends (...args: any) => Promise<any>>(
         .getOrCreate(...(params as any))
         .setState({status: "success", data: value, isStale: false});
     },
-    markStale(...params: Parameters<S>) {
-      const item = collection
-        .getOrCreate(...(params as any));
-      item.setState({...item.get(), isStale: true} as InitialState<R>);
+    async invalidate(
+      predicate?: ((...params: Parameters<S>) => boolean) | true,
+      options?: { reset?: boolean, fetching?: boolean }
+    ) {
+      const promises: Promise<void>[] = [];
+      predicate = typeof predicate === "function" ? predicate : () => true;
+      for (const item of collection.filter(predicate)) {
+        promises.push(item.invalidate(options?.reset, options?.fetching));
+      }
+      await Promise.all(promises);
     },
     forEach(predicate: (...params: Parameters<S>) => void) {
       collection.filter(predicate as any);
@@ -291,6 +300,20 @@ function createQuerySingle<R>(
     state.notify();
   }
 
+  async function invalidate(reset?: boolean, fetching?: boolean) {
+    if (currentState.isFetching && !fetching) {
+      return;
+    }
+
+    currentState = reset
+      ? getFullState({status: "pending"})
+      : {...currentState, isStale: true};
+    currentPromise = null;
+    if (isSubscribed) {
+      await fetchIfNeedRefresh().catch(() => null);
+    }
+  }
+
   function setState(newState: InitialState<R>) {
     currentState = getFullState(newState);
     currentPromise = null;
@@ -315,6 +338,7 @@ function createQuerySingle<R>(
     get: state.get,
     subscribe: state.subscribe,
     promise: fetchIfNeedRefresh,
+    invalidate,
     setState,
   };
 }

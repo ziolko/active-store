@@ -39,7 +39,7 @@ describe("createQuery", () => {
     await jest.advanceTimersByTimeAsync(2000);
     expect(query.state(1).status).toBe("success");
 
-    query.setState({...query.state(1), isStale: true} as any, 1);
+    query.invalidate((value) => value === 1);
     await jest.advanceTimersByTimeAsync(10);
 
     expect(query.state(1).isPending).toBe(false);
@@ -129,19 +129,6 @@ describe("createQuery", () => {
     expect(onUnsubscribe).toBeCalledTimes(1);
   });
 
-  it("Returns data provided by setState", async () => {
-    const query = activeAsync((id: number) => success(id));
-    query.setState({status: "success", data: 100, isStale: false}, 1);
-
-    expect(query.get(1)).toEqual(100);
-    expect(query.state(1).status).toEqual("success");
-    expect(query.state(1).isFetching).toEqual(false);
-
-    const promise = query.fetch({policy: 'cache-first'}, 1);
-    await jest.advanceTimersByTimeAsync(200);
-    expect(promise).resolves.toEqual(100);
-  });
-
   it("Returns data provided by set", async () => {
     const query = activeAsync((id: number) => success(id));
     query.set(100, 1);
@@ -153,19 +140,6 @@ describe("createQuery", () => {
     const promise = query.fetch({policy: 'cache-first'}, 1);
     await jest.advanceTimersByTimeAsync(200);
     expect(promise).resolves.toEqual(100);
-  });
-
-  it("After setState fetches data on 'get' if provided data is stale", async () => {
-    const query = activeAsync((id: number) => success(id));
-    query.setState({status: "success", data: 100, isStale: true}, 1);
-
-    expect(query.get(1)).toEqual(100);
-    expect(query.state(1).status).toEqual("success");
-    expect(query.state(1).isFetching).toEqual(true);
-
-    const promise = query.fetch({policy: 'cache-first'}, 1);
-    await jest.advanceTimersByTimeAsync(500);
-    await expect(promise).resolves.toEqual(1);
   });
 
   it("Supports retrying after initial fetch fails", async () => {
